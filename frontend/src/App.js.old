@@ -1,0 +1,229 @@
+import { useEffect, useState } from "react";
+
+const API_URL = "/api";
+
+const FinanceApp = () => {
+  const [activeTab, setActiveTab] = useState("compras");
+  const [compras, setCompras] = useState([]);
+  const [vendas, setVendas] = useState([]);
+  const [relatorio, setRelatorio] = useState({
+    totalCompras: 0,
+    totalVendas: 0,
+    totalGeral: 0,
+  });
+
+  const carregarDados = async () => {
+    try {
+      const [comprasRes, vendasRes, relatorioRes] = await Promise.all([
+        fetch(`${API_URL}/compras`),
+        fetch(`${API_URL}/vendas`),
+        fetch(`${API_URL}/relatorio`),
+      ]);
+
+      setCompras(await comprasRes.json());
+      setVendas(await vendasRes.json());
+      setRelatorio(await relatorioRes.json());
+    } catch (error) {
+      console.error("Erro ao carregar dados:", error);
+    }
+  };
+
+  useEffect(() => {
+    carregarDados();
+  }, []);
+
+  const registrarBaixaCompra = async (id, valorAtual) => {
+    const qtd = Number(
+      document.getElementById(`baixa-${id}`)?.value || 0
+    );
+
+    if (qtd <= 0) return;
+
+    await fetch(`${API_URL}/compras/${id}/baixa`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ valor: qtd }),
+    });
+
+    carregarDados();
+  };
+
+  const registrarVenda = async (id) => {
+    await fetch(`${API_URL}/vendas/${id}/registrar`, {
+      method: "POST",
+    });
+
+    carregarDados();
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-100 p-6">
+      <div className="max-w-6xl mx-auto bg-white shadow rounded-lg p-6">
+        <h1 className="text-3xl font-bold mb-6 text-center">
+          Controle Financeiro
+        </h1>
+
+        {/* Tabs */}
+        <div className="flex gap-4 mb-6 justify-center">
+          <button
+            onClick={() => setActiveTab("compras")}
+            className={`px-4 py-2 rounded ${
+              activeTab === "compras"
+                ? "bg-blue-600 text-white"
+                : "bg-gray-200"
+            }`}
+          >
+            Compras
+          </button>
+
+          <button
+            onClick={() => setActiveTab("vendas")}
+            className={`px-4 py-2 rounded ${
+              activeTab === "vendas"
+                ? "bg-green-600 text-white"
+                : "bg-gray-200"
+            }`}
+          >
+            Vendas
+          </button>
+
+          <button
+            onClick={() => setActiveTab("relatorio")}
+            className={`px-4 py-2 rounded ${
+              activeTab === "relatorio"
+                ? "bg-purple-600 text-white"
+                : "bg-gray-200"
+            }`}
+          >
+            Relatório
+          </button>
+        </div>
+
+        {/* Compras */}
+        {activeTab === "compras" && (
+          <div className="space-y-4">
+            {compras.map((c) => (
+              <div
+                key={c.id}
+                className="border rounded p-4 flex items-center gap-4"
+              >
+                <div className="flex-1">
+                  <div className="font-semibold">{c.descricao}</div>
+                  <div className="text-sm text-gray-600">
+                    Valor total: R$ {(Number(c.valor) || 0).toFixed(2)}
+                  </div>
+                </div>
+
+                <input
+                  id={`baixa-${c.id}`}
+                  type="number"
+                  step="0.01"
+                  className="border rounded px-2 py-1 w-32"
+                  placeholder="Valor"
+                />
+
+                <button
+                  onClick={() => registrarBaixaCompra(c.id, c.valor)}
+                  className="bg-blue-600 text-white px-4 py-2 rounded"
+                >
+                  Dar baixa
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Vendas */}
+        {activeTab === "vendas" && (
+          <div className="space-y-4">
+            {vendas.map((v) => (
+              <div
+                key={v.id}
+                className="border rounded p-4 flex items-center gap-4"
+              >
+                <div className="flex-1">
+                  <div className="font-semibold">{v.descricao}</div>
+                  <div className="text-sm text-gray-600">
+                    Valor: R$ {(Number(v.valor) || 0).toFixed(2)}
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => registrarVenda(v.id)}
+                  className="bg-green-600 text-white px-4 py-2 rounded"
+                >
+                  Registrar venda
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Relatório */}
+        {activeTab === "relatorio" && (
+          <div className="space-y-6">
+            <div className="text-lg font-semibold">
+              Total Geral: R$ {(Number(relatorio.totalGeral) || 0).toFixed(2)}
+            </div>
+
+            <div className="flex items-center">
+              <span className="w-32 font-semibold">Compras:</span>
+              <div className="flex-1 bg-gray-200 rounded-full h-8 overflow-hidden">
+                <div
+                  className="bg-blue-500 h-full flex items-center justify-end pr-2 text-white font-semibold"
+                  style={{
+                    width: `${
+                      relatorio.totalGeral > 0
+                        ? (relatorio.totalCompras /
+                            relatorio.totalGeral) *
+                          100
+                        : 0
+                    }%`,
+                  }}
+                >
+                  {relatorio.totalGeral > 0
+                    ? (
+                        (relatorio.totalCompras /
+                          relatorio.totalGeral) *
+                        100
+                      ).toFixed(1)
+                    : 0}
+                  %
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center">
+              <span className="w-32 font-semibold">Vendas:</span>
+              <div className="flex-1 bg-gray-200 rounded-full h-8 overflow-hidden">
+                <div
+                  className="bg-green-500 h-full flex items-center justify-end pr-2 text-white font-semibold"
+                  style={{
+                    width: `${
+                      relatorio.totalGeral > 0
+                        ? (relatorio.totalVendas /
+                            relatorio.totalGeral) *
+                          100
+                        : 0
+                    }%`,
+                  }}
+                >
+                  {relatorio.totalGeral > 0
+                    ? (
+                        (relatorio.totalVendas /
+                          relatorio.totalGeral) *
+                        100
+                      ).toFixed(1)
+                    : 0}
+                  %
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default FinanceApp;

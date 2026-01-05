@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  # Banco de dados PostgreSQL
+  db:
+    image: postgres:15-alpine
+    container_name: controle-contas-db
+    restart: always
+    environment:
+      POSTGRES_USER: controlecontas
+      POSTGRES_PASSWORD: senha123
+      POSTGRES_DB: controle_contas
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - controle-contas-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U controlecontas -d controle_contas"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: controle-contas-backend
+    restart: always
+    environment:
+      DATABASE_URL: postgresql://controlecontas:senha123@db:5432/controle_contas
+      PORT: 3001
+    ports:
+      - "3001:3001"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - controle-contas-network
+
+  # Frontend React
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: controle-contas-frontend
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - controle-contas-network
+
+volumes:
+  postgres_data:
+
+networks:
+  controle-contas-network:
+    driver: bridge
