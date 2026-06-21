@@ -147,6 +147,7 @@ const FinanceApp = () => {
   const [usuarios, setUsuarios] = useState([]);
   const [platformTenants, setPlatformTenants] = useState([]);
   const [platformUsers, setPlatformUsers] = useState([]);
+  const [platformAdmins, setPlatformAdmins] = useState([]);
   const [loading, setLoading] = useState(false);
   const [sessionLoading, setSessionLoading] = useState(Boolean(token));
   const [errorMessage, setErrorMessage] = useState('');
@@ -208,13 +209,15 @@ const FinanceApp = () => {
     const isPlatformScope = sessionUser?.scope === 'platform' || sessionUser?.role === 'super_admin';
 
     if (isPlatformScope) {
-      const [tenantsData, usersData] = await Promise.all([
+      const [tenantsData, usersData, adminsData] = await Promise.all([
         apiFetch('/platform/tenants'),
-        apiFetch('/platform/users')
+        apiFetch('/platform/users'),
+        apiFetch('/platform/admins')
       ]);
 
       setPlatformTenants(tenantsData);
       setPlatformUsers(usersData);
+      setPlatformAdmins(adminsData);
       setCompras([]);
       setContas([]);
       setManutencoes([]);
@@ -250,6 +253,7 @@ const FinanceApp = () => {
 
     setPlatformTenants([]);
     setPlatformUsers([]);
+    setPlatformAdmins([]);
   };
 
   useEffect(() => {
@@ -285,6 +289,7 @@ const FinanceApp = () => {
     setUsuarios([]);
     setPlatformTenants([]);
     setPlatformUsers([]);
+    setPlatformAdmins([]);
     clearMessages();
   };
 
@@ -427,10 +432,34 @@ const FinanceApp = () => {
     }, 'Usuário removido da plataforma com sucesso');
   };
 
-  const excluirTenantPlataforma = async (tenantId) => {
+  const excluirTenantPlataforma = async (tenantId, tenantSlug) => {
+    const confirmation = window.prompt(`Para excluir este tenant, digite o slug exatamente: ${tenantSlug}`);
+
+    if (!confirmation) {
+      return;
+    }
+
     await runMutation(async () => {
-      await apiFetch(`/platform/tenants/${tenantId}`, { method: 'DELETE' });
+      await apiFetch(`/platform/tenants/${tenantId}`, {
+        method: 'DELETE',
+        body: JSON.stringify({ confirmSlug: confirmation })
+      });
     }, 'Tenant removido com sucesso');
+  };
+
+  const excluirAdminPlataforma = async (adminId, adminEmail) => {
+    const confirmation = window.prompt(`Para excluir este super admin, digite o e-mail exatamente: ${adminEmail}`);
+
+    if (!confirmation) {
+      return;
+    }
+
+    await runMutation(async () => {
+      await apiFetch(`/platform/admins/${adminId}`, {
+        method: 'DELETE',
+        body: JSON.stringify({ confirmEmail: confirmation })
+      });
+    }, 'Administrador de plataforma removido com sucesso');
   };
 
   const relatorio = useMemo(() => {
@@ -951,10 +980,11 @@ const FinanceApp = () => {
                             <td className="py-4 pr-4">
                               <button
                                 type="button"
-                                onClick={() => excluirTenantPlataforma(tenant.id)}
-                                className="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-3 py-2 font-semibold text-white transition hover:bg-rose-700"
+                                onClick={() => excluirTenantPlataforma(tenant.id, tenant.slug)}
+                                disabled={tenant.is_protected || loading}
+                                className="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-3 py-2 font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
                               >
-                                <Trash2 size={14} /> Excluir tenant
+                                <Trash2 size={14} /> {tenant.is_protected ? 'Tenant protegido' : 'Excluir tenant'}
                               </button>
                             </td>
                           </tr>
@@ -962,6 +992,52 @@ const FinanceApp = () => {
                         {platformTenants.length === 0 && (
                           <tr>
                             <td className="py-5 text-center text-slate-500" colSpan={6}>Nenhum tenant encontrado</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="mt-6 rounded-3xl border border-slate-200 bg-white shadow-sm">
+                  <div className="border-b border-slate-200 px-5 py-4">
+                    <h3 className="text-lg font-bold">Super admins da plataforma</h3>
+                  </div>
+                  <div className="overflow-x-auto px-5 py-4">
+                    <table className="min-w-full text-left text-sm">
+                      <thead className="text-slate-500">
+                        <tr>
+                          <th className="pb-3 pr-4 font-semibold">Nome</th>
+                          <th className="pb-3 pr-4 font-semibold">E-mail</th>
+                          <th className="pb-3 pr-4 font-semibold">Status</th>
+                          <th className="pb-3 pr-4 font-semibold">Ações</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {platformAdmins.map((platformAdmin) => {
+                          const isCurrentAdmin = String(platformAdmin.id) === String(user?.id);
+
+                          return (
+                            <tr key={platformAdmin.id} className="border-t border-slate-100 align-top">
+                              <td className="py-4 pr-4 font-semibold text-slate-800">{platformAdmin.name}</td>
+                              <td className="py-4 pr-4 text-slate-600">{platformAdmin.email}</td>
+                              <td className="py-4 pr-4 text-slate-600">{platformAdmin.active ? 'Ativo' : 'Inativo'}</td>
+                              <td className="py-4 pr-4">
+                                <button
+                                  type="button"
+                                  onClick={() => excluirAdminPlataforma(platformAdmin.id, platformAdmin.email)}
+                                  disabled={isCurrentAdmin || loading}
+                                  className="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-3 py-2 font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                  <Trash2 size={14} /> {isCurrentAdmin ? 'Conta logada protegida' : 'Excluir admin'}
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        {platformAdmins.length === 0 && (
+                          <tr>
+                            <td className="py-5 text-center text-slate-500" colSpan={4}>Nenhum super admin encontrado</td>
                           </tr>
                         )}
                       </tbody>
@@ -1028,6 +1104,7 @@ const FinanceApp = () => {
                 {isAdmin && <SummaryRow label="Usuários ativos" value={String(usuarios.filter((registeredUser) => registeredUser.active).length)} />}
                 {isPlatformAdmin && <SummaryRow label="Tenants" value={String(platformTenants.length)} />}
                 {isPlatformAdmin && <SummaryRow label="Usuários globais" value={String(platformUsers.length)} />}
+                {isPlatformAdmin && <SummaryRow label="Super admins" value={String(platformAdmins.length)} />}
               </div>
             </div>
 

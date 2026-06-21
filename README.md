@@ -20,6 +20,9 @@ O projeto agora cobre os três pontos pedidos:
 - `super_admin`: usuário global da ferramenta (fora do tenant). Pode listar e excluir tenants, além de remover usuários de qualquer tenant.
 - O super admin acessa a aba `Plataforma` no frontend.
 - As ações globais usam endpoints dedicados em `/api/platform/*`.
+- Proteção ativa: o tenant padrão inicial (`ADMIN_TENANT_SLUG`) não pode ser excluído.
+- Proteção ativa: o super admin logado não pode excluir a própria conta.
+- Confirmação forte: para exclusão de tenant é obrigatório digitar o slug; para exclusão de super admin é obrigatório digitar o e-mail.
 
 Existe somente um administrador proprietário. Usuários adicionais sempre são criados como `user`.
 

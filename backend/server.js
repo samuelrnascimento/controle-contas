@@ -779,9 +779,11 @@ app.get('/api/platform/tenants', authenticateToken, requirePlatformAdmin, async 
       : '0::int AS users_count';
 
     const result = await pool.query(
-      `SELECT t.id, t.name, t.slug, t.plan, t.subscription_status, t.created_at, ${usersCountSql}
+      `SELECT t.id, t.name, t.slug, t.plan, t.subscription_status, t.created_at, ${usersCountSql},
+              (t.slug = $1) AS is_protected
        FROM tenants t
-       ORDER BY t.created_at DESC, t.name ASC`
+       ORDER BY t.created_at DESC, t.name ASC`,
+      [adminTenantSlug]
     );
 
     res.json(result.rows);
@@ -825,6 +827,56 @@ app.get('/api/platform/users', authenticateToken, requirePlatformAdmin, async (r
   }
 });
 
+app.get('/api/platform/admins', authenticateToken, requirePlatformAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT id, name, email, role, active, created_at FROM platform_users ORDER BY created_at ASC, id ASC'
+    );
+
+    return res.json(result.rows.map(sanitizePlatformUser));
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/platform/admins/:id', authenticateToken, requirePlatformAdmin, async (req, res) => {
+  try {
+    const targetId = String(req.params.id || '').trim();
+    const confirmEmail = String(req.body?.confirmEmail || '').trim().toLowerCase();
+
+    if (!targetId) {
+      return res.status(400).json({ error: 'Identificador de administrador inválido' });
+    }
+
+    if (!confirmEmail) {
+      return res.status(400).json({ error: 'Confirmação do e-mail do administrador é obrigatória' });
+    }
+
+    const targetAdmin = await pool.query(
+      'SELECT id, email FROM platform_users WHERE id::text = $1 LIMIT 1',
+      [targetId]
+    );
+
+    if (targetAdmin.rows.length === 0) {
+      return res.status(404).json({ error: 'Administrador de plataforma não encontrado' });
+    }
+
+    if (String(req.user.id) === targetId) {
+      return res.status(400).json({ error: 'Você não pode excluir o próprio super admin logado' });
+    }
+
+    if (String(targetAdmin.rows[0].email).trim().toLowerCase() !== confirmEmail) {
+      return res.status(400).json({ error: 'Confirmação inválida. Informe exatamente o e-mail do administrador.' });
+    }
+
+    const result = await pool.query('DELETE FROM platform_users WHERE id::text = $1 RETURNING id', [targetId]);
+
+    return res.json({ message: 'Administrador de plataforma removido com sucesso' });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 app.delete('/api/platform/users/:id', authenticateToken, requirePlatformAdmin, async (req, res) => {
   try {
     const targetId = String(req.params.id || '').trim();
@@ -852,16 +904,34 @@ app.delete('/api/platform/tenants/:id', authenticateToken, requirePlatformAdmin,
 
   try {
     const targetId = String(req.params.id || '').trim();
+    const confirmSlug = String(req.body?.confirmSlug || '').trim().toLowerCase();
 
     if (!targetId) {
       return res.status(400).json({ error: 'Identificador de tenant inválido' });
     }
 
-    const result = await pool.query('DELETE FROM tenants WHERE id::text = $1 RETURNING id', [targetId]);
+    if (!confirmSlug) {
+      return res.status(400).json({ error: 'Confirmação do slug do tenant é obrigatória' });
+    }
 
-    if (result.rows.length === 0) {
+    const targetTenant = await pool.query(
+      'SELECT id, slug FROM tenants WHERE id::text = $1 LIMIT 1',
+      [targetId]
+    );
+
+    if (targetTenant.rows.length === 0) {
       return res.status(404).json({ error: 'Tenant não encontrado' });
     }
+
+    if (targetTenant.rows[0].slug === adminTenantSlug) {
+      return res.status(400).json({ error: 'O tenant padrão inicial está protegido contra exclusão' });
+    }
+
+    if (String(targetTenant.rows[0].slug).trim().toLowerCase() !== confirmSlug) {
+      return res.status(400).json({ error: 'Confirmação inválida. Informe exatamente o slug do tenant.' });
+    }
+
+    const result = await pool.query('DELETE FROM tenants WHERE id::text = $1 RETURNING id', [targetId]);
 
     return res.json({ message: 'Tenant removido com sucesso' });
   } catch (error) {
