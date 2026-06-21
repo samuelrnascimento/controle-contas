@@ -158,7 +158,7 @@ const FinanceApp = () => {
   const [mesFiltroManutencoes, setMesFiltroManutencoes] = useState(defaultMonth);
   const [baixasEstoque, setBaixasEstoque] = useState({});
 
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === 'admin' || user?.role === 'owner';
 
   const apiFetch = async (path, options = {}) => {
     const headers = {

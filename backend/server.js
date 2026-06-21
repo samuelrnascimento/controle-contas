@@ -18,17 +18,20 @@ const pool = new Pool({
 app.use(cors());
 app.use(express.json());
 
+const normalizeRole = (role) => (role === 'owner' ? 'admin' : role);
+const isUserActive = (user) => user.active === undefined || user.active === null || user.active === true;
+
 const sanitizeUser = (user) => ({
   id: user.id,
   name: user.name,
   email: user.email,
-  role: user.role,
-  active: user.active,
+  role: normalizeRole(user.role),
+  active: isUserActive(user),
   createdAt: user.created_at
 });
 
 const createToken = (user) => jwt.sign(
-  { sub: user.id, role: user.role, email: user.email },
+  { sub: user.id, role: normalizeRole(user.role), email: user.email },
   jwtSecret,
   { expiresIn: '12h' }
 );
@@ -53,7 +56,7 @@ const authenticateToken = async (req, res, next) => {
       [payload.sub]
     );
 
-    if (result.rows.length === 0 || !result.rows[0].active) {
+    if (result.rows.length === 0 || !isUserActive(result.rows[0])) {
       return res.status(401).json({ error: 'Usuário inválido ou inativo' });
     }
 
@@ -65,7 +68,8 @@ const authenticateToken = async (req, res, next) => {
 };
 
 const requireRole = (...roles) => (req, res, next) => {
-  if (!req.user || !roles.includes(req.user.role)) {
+  const userRole = normalizeRole(req.user?.role);
+  if (!req.user || !roles.includes(userRole)) {
     return res.status(403).json({ error: 'Permissão insuficiente' });
   }
 
@@ -85,6 +89,9 @@ const ensureSchema = async () => {
       active BOOLEAN NOT NULL DEFAULT TRUE,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
+
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT TRUE;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
 
     CREATE UNIQUE INDEX IF NOT EXISTS idx_users_single_admin ON users (role) WHERE role = 'admin';
     CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
@@ -130,8 +137,8 @@ const ensureSchema = async () => {
 
 const ensureAdminUser = async () => {
   const existingAdmin = await pool.query(
-    'SELECT id FROM users WHERE role = $1 LIMIT 1',
-    ['admin']
+    'SELECT id FROM users WHERE role IN ($1, $2) LIMIT 1',
+    ['admin', 'owner']
   );
 
   if (existingAdmin.rows.length > 0) {
@@ -177,7 +184,7 @@ app.post('/api/auth/login', async (req, res) => {
     const user = result.rows[0];
     const passwordMatches = await bcrypt.compare(password, user.password_hash);
 
-    if (!passwordMatches || !user.active) {
+    if (!passwordMatches || !isUserActive(user)) {
       return res.status(401).json({ error: 'Credenciais inválidas' });
     }
 
