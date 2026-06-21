@@ -50,7 +50,7 @@ services:
     networks:
       - controle-contas-network
 
-  # Frontend React
+  # FrontendReact
   frontend:
     build:
       context: ./frontend
