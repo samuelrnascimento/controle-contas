@@ -168,13 +168,14 @@ const FinanceApp = () => {
   const isAdmin = !isPlatformAdmin && (user?.role === 'admin' || user?.role === 'owner');
 
   const apiFetch = async (path, options = {}) => {
+    const authToken = options.authToken ?? token;
     const headers = {
       'Content-Type': 'application/json',
       ...(options.headers || {})
     };
 
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
+    if (authToken) {
+      headers.Authorization = `Bearer ${authToken}`;
     }
 
     const response = await fetch(`${API_BASE}${path}`, {
@@ -205,14 +206,14 @@ const FinanceApp = () => {
     setSuccessMessage('');
   };
 
-  const loadProtectedData = async (sessionUser = user) => {
+  const loadProtectedData = async (sessionUser = user, authToken) => {
     const isPlatformScope = sessionUser?.scope === 'platform' || sessionUser?.role === 'super_admin';
 
     if (isPlatformScope) {
       const [tenantsData, usersData, adminsData] = await Promise.all([
-        apiFetch('/platform/tenants'),
-        apiFetch('/platform/users'),
-        apiFetch('/platform/admins')
+        apiFetch('/platform/tenants', { authToken }),
+        apiFetch('/platform/users', { authToken }),
+        apiFetch('/platform/admins', { authToken })
       ]);
 
       setPlatformTenants(tenantsData);
@@ -228,14 +229,14 @@ const FinanceApp = () => {
 
     const shouldLoadUsers = sessionUser?.role === 'admin' || sessionUser?.role === 'owner';
     const requests = [
-      apiFetch('/compras'),
-      apiFetch('/contas'),
-      apiFetch('/manutencoes'),
-      apiFetch('/estoque')
+      apiFetch('/compras', { authToken }),
+      apiFetch('/contas', { authToken }),
+      apiFetch('/manutencoes', { authToken }),
+      apiFetch('/estoque', { authToken })
     ];
 
     if (shouldLoadUsers) {
-      requests.push(apiFetch('/users'));
+      requests.push(apiFetch('/users', { authToken }));
     }
 
     const [comprasData, contasData, manutencoesData, estoqueData, usersData] = await Promise.all(requests);
@@ -267,7 +268,7 @@ const FinanceApp = () => {
         const session = await apiFetch('/auth/me');
         setUser(session.user);
         setActiveTab(session.user.scope === 'platform' ? 'platform' : 'compras');
-        await loadProtectedData(session.user);
+        await loadProtectedData(session.user, token);
       } catch (error) {
         setErrorMessage(normalizeError(error));
       } finally {
@@ -308,7 +309,7 @@ const FinanceApp = () => {
       setToken(data.token);
       setUser(data.user);
       setActiveTab(data.user.scope === 'platform' ? 'platform' : 'compras');
-      await loadProtectedData(data.user);
+      await loadProtectedData(data.user, data.token);
       setLoginForm({ email: '', password: '' });
       setSuccessMessage(`Sessão iniciada como ${data.user.name}`);
     } catch (error) {
