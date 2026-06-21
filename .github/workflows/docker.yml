@@ -8,6 +8,15 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - image_name: finansam-backend
+            context: ./backend
+            dockerfile: ./backend/Dockerfile
+          - image_name: finansam-frontend
+            context: ./frontend
+            dockerfile: ./frontend/Dockerfile
 
     permissions:
       contents: read
@@ -25,7 +34,9 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build e publicar imagem Docker
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
           push: true
-          tags: ghcr.io/samuelrnascimento/finansam:latest
+          tags: ghcr.io/${{ github.repository_owner }}/${{ matrix.image_name }}:latest
