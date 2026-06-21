@@ -34,8 +34,8 @@ services:
       DATABASE_URL: postgresql://controlecontas:senha123@db:5432/controle_contas
       PORT: 3001
       JWT_SECRET: troque-esta-chave-em-producao
-      ADMIN_NAME: Proprietario
-      ADMIN_EMAIL: infrati@smcorp.com.br
+      ADMIN_NAME: Finansam
+      ADMIN_EMAIL: finansam@smcorp.com.br
       ADMIN_PASSWORD: Smcorp1234*
     ports:
       - "3001:3001"
