@@ -10,6 +10,11 @@ const jwtSecret = process.env.JWT_SECRET || 'troque-esta-chave-em-producao';
 const adminName = process.env.ADMIN_NAME || 'Proprietario';
 const adminEmail = process.env.ADMIN_EMAIL || 'owner@finansam.local';
 const adminPassword = process.env.ADMIN_PASSWORD || 'Troque123!';
+const adminTenantName = process.env.ADMIN_TENANT_NAME || 'Empresa Principal';
+const adminTenantSlug = process.env.ADMIN_TENANT_SLUG || 'empresa-principal';
+const platformAdminName = process.env.PLATFORM_ADMIN_NAME || adminName;
+const platformAdminEmail = process.env.PLATFORM_ADMIN_EMAIL || adminEmail;
+const platformAdminPassword = process.env.PLATFORM_ADMIN_PASSWORD || adminPassword;
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL
@@ -17,6 +22,15 @@ const pool = new Pool({
 
 app.use(cors());
 app.use(express.json());
+
+const runtimeCapabilities = {
+  hasTenantsTable: false,
+  hasUsersTenantId: false,
+  hasComprasTenantId: false,
+  hasContasTenantId: false,
+  hasManutencoesTenantId: false,
+  hasEstoqueTenantId: false
+};
 
 const normalizeRole = (role) => (role === 'owner' ? 'admin' : role);
 const isUserActive = (user) => user.active === undefined || user.active === null || user.active === true;
@@ -27,11 +41,29 @@ const sanitizeUser = (user) => ({
   email: user.email,
   role: normalizeRole(user.role),
   active: isUserActive(user),
+  scope: 'tenant',
+  tenantId: user.tenant_id || null,
   createdAt: user.created_at
 });
 
-const createToken = (user) => jwt.sign(
-  { sub: user.id, role: normalizeRole(user.role), email: user.email },
+const sanitizePlatformUser = (user) => ({
+  id: user.id,
+  name: user.name,
+  email: user.email,
+  role: 'super_admin',
+  active: isUserActive(user),
+  scope: 'platform',
+  createdAt: user.created_at
+});
+
+const createTenantToken = (user) => jwt.sign(
+  { sub: String(user.id), role: normalizeRole(user.role), scope: 'tenant', email: user.email },
+  jwtSecret,
+  { expiresIn: '12h' }
+);
+
+const createPlatformToken = (user) => jwt.sign(
+  { sub: String(user.id), role: 'super_admin', scope: 'platform', email: user.email },
   jwtSecret,
   { expiresIn: '12h' }
 );
@@ -51,8 +83,24 @@ const authenticateToken = async (req, res, next) => {
 
   try {
     const payload = jwt.verify(token, jwtSecret);
+
+    if (payload.scope === 'platform') {
+      const result = await pool.query(
+        'SELECT id, name, email, role, active, created_at FROM platform_users WHERE id::text = $1',
+        [payload.sub]
+      );
+
+      if (result.rows.length === 0 || !isUserActive(result.rows[0])) {
+        return res.status(401).json({ error: 'Usuário de plataforma inválido ou inativo' });
+      }
+
+      req.authScope = 'platform';
+      req.user = result.rows[0];
+      return next();
+    }
+
     const result = await pool.query(
-      'SELECT id, name, email, role, active, created_at FROM users WHERE id = $1',
+      'SELECT * FROM users WHERE id::text = $1',
       [payload.sub]
     );
 
@@ -60,11 +108,28 @@ const authenticateToken = async (req, res, next) => {
       return res.status(401).json({ error: 'Usuário inválido ou inativo' });
     }
 
+    req.authScope = 'tenant';
     req.user = result.rows[0];
     next();
   } catch (error) {
     return res.status(401).json({ error: 'Token inválido' });
   }
+};
+
+const requireTenantScope = (req, res, next) => {
+  if (req.authScope !== 'tenant') {
+    return res.status(403).json({ error: 'Ação disponível apenas para usuários de empresa' });
+  }
+
+  next();
+};
+
+const requirePlatformAdmin = (req, res, next) => {
+  if (req.authScope !== 'platform') {
+    return res.status(403).json({ error: 'Permissão de plataforma obrigatória' });
+  }
+
+  next();
 };
 
 const requireRole = (...roles) => (req, res, next) => {
@@ -132,10 +197,116 @@ const ensureSchema = async () => {
     CREATE INDEX IF NOT EXISTS idx_contas_mes ON contas(mes);
     CREATE INDEX IF NOT EXISTS idx_manutencoes_data ON manutencoes(data);
     CREATE INDEX IF NOT EXISTS idx_estoque_item ON estoque(item);
+
+    CREATE TABLE IF NOT EXISTS platform_users (
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(255) NOT NULL,
+      email CITEXT NOT NULL UNIQUE,
+      password_hash VARCHAR(255) NOT NULL,
+      role VARCHAR(30) NOT NULL DEFAULT 'super_admin' CHECK (role IN ('super_admin')),
+      active BOOLEAN NOT NULL DEFAULT TRUE,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_platform_users_email ON platform_users(email);
   `);
 };
 
+const discoverCapabilities = async () => {
+  const tableResult = await pool.query(
+    `SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.tables
+      WHERE table_schema = 'public' AND table_name = 'tenants'
+    ) AS has_tenants`
+  );
+
+  const usersTenantResult = await pool.query(
+    `SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'tenant_id'
+    ) AS has_users_tenant_id`
+  );
+
+  runtimeCapabilities.hasTenantsTable = tableResult.rows[0]?.has_tenants === true;
+  runtimeCapabilities.hasUsersTenantId = usersTenantResult.rows[0]?.has_users_tenant_id === true;
+
+  const comprasTenantResult = await pool.query(
+    `SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'compras' AND column_name = 'tenant_id'
+    ) AS has_compras_tenant_id`
+  );
+
+  const contasTenantResult = await pool.query(
+    `SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'contas' AND column_name = 'tenant_id'
+    ) AS has_contas_tenant_id`
+  );
+
+  const manutencoesTenantResult = await pool.query(
+    `SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'manutencoes' AND column_name = 'tenant_id'
+    ) AS has_manutencoes_tenant_id`
+  );
+
+  const estoqueTenantResult = await pool.query(
+    `SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'estoque' AND column_name = 'tenant_id'
+    ) AS has_estoque_tenant_id`
+  );
+
+  runtimeCapabilities.hasComprasTenantId = comprasTenantResult.rows[0]?.has_compras_tenant_id === true;
+  runtimeCapabilities.hasContasTenantId = contasTenantResult.rows[0]?.has_contas_tenant_id === true;
+  runtimeCapabilities.hasManutencoesTenantId = manutencoesTenantResult.rows[0]?.has_manutencoes_tenant_id === true;
+  runtimeCapabilities.hasEstoqueTenantId = estoqueTenantResult.rows[0]?.has_estoque_tenant_id === true;
+};
+
 const ensureAdminUser = async () => {
+  if (runtimeCapabilities.hasUsersTenantId) {
+    if (!runtimeCapabilities.hasTenantsTable) {
+      throw new Error('users.tenant_id existe, mas a tabela tenants não está disponível');
+    }
+
+    const tenantResult = await pool.query(
+      `INSERT INTO tenants (name, slug, plan, subscription_status)
+       VALUES ($1, $2, 'starter', 'active')
+       ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name
+       RETURNING id`,
+      [adminTenantName, adminTenantSlug]
+    );
+
+    const tenantId = tenantResult.rows[0].id;
+
+    const existingAdmin = await pool.query(
+      'SELECT id FROM users WHERE tenant_id = $1 AND role IN ($2, $3) LIMIT 1',
+      [tenantId, 'admin', 'owner']
+    );
+
+    if (existingAdmin.rows.length > 0) {
+      return;
+    }
+
+    const passwordHash = await bcrypt.hash(adminPassword, 10);
+
+    await pool.query(
+      `INSERT INTO users (tenant_id, name, email, password_hash, role, active)
+       VALUES ($1, $2, $3, $4, 'owner', true)`,
+      [tenantId, adminName, adminEmail, passwordHash]
+    );
+
+    console.log(`Administrador do tenant criado: ${adminEmail}`);
+    return;
+  }
+
   const existingAdmin = await pool.query(
     'SELECT id FROM users WHERE role IN ($1, $2) LIMIT 1',
     ['admin', 'owner']
@@ -155,6 +326,24 @@ const ensureAdminUser = async () => {
   console.log(`Administrador criado: ${adminEmail}`);
 };
 
+const ensurePlatformAdminUser = async () => {
+  const existingPlatformAdmin = await pool.query('SELECT id FROM platform_users LIMIT 1');
+
+  if (existingPlatformAdmin.rows.length > 0) {
+    return;
+  }
+
+  const passwordHash = await bcrypt.hash(platformAdminPassword, 10);
+
+  await pool.query(
+    `INSERT INTO platform_users (name, email, password_hash, role, active)
+     VALUES ($1, $2, $3, 'super_admin', true)`,
+    [platformAdminName, platformAdminEmail, passwordHash]
+  );
+
+  console.log(`Super admin da plataforma criado: ${platformAdminEmail}`);
+};
+
 app.get('/api/health', async (req, res) => {
   try {
     await pool.query('SELECT NOW()');
@@ -172,6 +361,22 @@ app.post('/api/auth/login', async (req, res) => {
   }
 
   try {
+    const platformResult = await pool.query(
+      'SELECT * FROM platform_users WHERE email = $1 LIMIT 1',
+      [email]
+    );
+
+    if (platformResult.rows.length > 0) {
+      const platformUser = platformResult.rows[0];
+      const passwordMatches = await bcrypt.compare(password, platformUser.password_hash);
+
+      if (!passwordMatches || !isUserActive(platformUser)) {
+        return res.status(401).json({ error: 'Credenciais inválidas' });
+      }
+
+      return res.json({ token: createPlatformToken(platformUser), user: sanitizePlatformUser(platformUser) });
+    }
+
     const result = await pool.query(
       'SELECT * FROM users WHERE email = $1 LIMIT 1',
       [email]
@@ -188,28 +393,36 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(401).json({ error: 'Credenciais inválidas' });
     }
 
-    res.json({ token: createToken(user), user: sanitizeUser(user) });
+    res.json({ token: createTenantToken(user), user: sanitizeUser(user) });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
 app.get('/api/auth/me', authenticateToken, async (req, res) => {
-  res.json({ user: sanitizeUser(req.user) });
+  if (req.authScope === 'platform') {
+    return res.json({ user: sanitizePlatformUser(req.user) });
+  }
+
+  return res.json({ user: sanitizeUser(req.user) });
 });
 
-app.get('/api/users', authenticateToken, requireRole('admin'), async (req, res) => {
+app.get('/api/users', authenticateToken, requireTenantScope, requireRole('admin'), async (req, res) => {
   try {
-    const result = await pool.query(
-      'SELECT id, name, email, role, active, created_at FROM users ORDER BY role ASC, name ASC'
-    );
+    const result = runtimeCapabilities.hasUsersTenantId
+      ? await pool.query(
+        'SELECT * FROM users WHERE tenant_id = $1 ORDER BY role ASC, name ASC',
+        [req.user.tenant_id]
+      )
+      : await pool.query('SELECT * FROM users ORDER BY role ASC, name ASC');
+
     res.json(result.rows.map(sanitizeUser));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-app.post('/api/users', authenticateToken, requireRole('admin'), async (req, res) => {
+app.post('/api/users', authenticateToken, requireTenantScope, requireRole('admin'), async (req, res) => {
   const { name, email, password, role } = req.body;
 
   if (!name || !email || !password) {
@@ -222,12 +435,19 @@ app.post('/api/users', authenticateToken, requireRole('admin'), async (req, res)
 
   try {
     const passwordHash = await bcrypt.hash(password, 10);
-    const result = await pool.query(
-      `INSERT INTO users (name, email, password_hash, role, active)
-       VALUES ($1, $2, $3, 'user', true)
-       RETURNING id, name, email, role, active, created_at`,
-      [name, email, passwordHash]
-    );
+    const result = runtimeCapabilities.hasUsersTenantId
+      ? await pool.query(
+        `INSERT INTO users (tenant_id, name, email, password_hash, role, active)
+         VALUES ($1, $2, $3, $4, 'user', true)
+         RETURNING *`,
+        [req.user.tenant_id, name, email, passwordHash]
+      )
+      : await pool.query(
+        `INSERT INTO users (name, email, password_hash, role, active)
+         VALUES ($1, $2, $3, 'user', true)
+         RETURNING *`,
+        [name, email, passwordHash]
+      );
 
     res.status(201).json(sanitizeUser(result.rows[0]));
   } catch (error) {
@@ -239,16 +459,18 @@ app.post('/api/users', authenticateToken, requireRole('admin'), async (req, res)
   }
 });
 
-app.patch('/api/users/:id', authenticateToken, requireRole('admin'), async (req, res) => {
+app.patch('/api/users/:id', authenticateToken, requireTenantScope, requireRole('admin'), async (req, res) => {
   const { name, password, active } = req.body;
-  const userId = Number(req.params.id);
+  const userId = String(req.params.id || '').trim();
 
-  if (!Number.isInteger(userId)) {
+  if (!userId) {
     return res.status(400).json({ error: 'Identificador de usuário inválido' });
   }
 
   try {
-    const existing = await pool.query('SELECT * FROM users WHERE id = $1', [userId]);
+    const existing = runtimeCapabilities.hasUsersTenantId
+      ? await pool.query('SELECT * FROM users WHERE id::text = $1 AND tenant_id = $2', [userId, req.user.tenant_id])
+      : await pool.query('SELECT * FROM users WHERE id::text = $1', [userId]);
 
     if (existing.rows.length === 0) {
       return res.status(404).json({ error: 'Usuário não encontrado' });
@@ -256,7 +478,7 @@ app.patch('/api/users/:id', authenticateToken, requireRole('admin'), async (req,
 
     const user = existing.rows[0];
 
-    if (user.role === 'admin' && active === false) {
+    if (normalizeRole(user.role) === 'admin' && active === false) {
       return res.status(400).json({ error: 'O administrador proprietário não pode ser desativado' });
     }
 
@@ -268,13 +490,21 @@ app.patch('/api/users/:id', authenticateToken, requireRole('admin'), async (req,
     const nextActive = typeof active === 'boolean' ? active : user.active;
     const nextPasswordHash = password ? await bcrypt.hash(password, 10) : user.password_hash;
 
-    const result = await pool.query(
-      `UPDATE users
-       SET name = $1, password_hash = $2, active = $3
-       WHERE id = $4
-       RETURNING id, name, email, role, active, created_at`,
-      [nextName, nextPasswordHash, nextActive, userId]
-    );
+    const result = runtimeCapabilities.hasUsersTenantId
+      ? await pool.query(
+        `UPDATE users
+         SET name = $1, password_hash = $2, active = $3
+         WHERE id::text = $4 AND tenant_id = $5
+         RETURNING *`,
+        [nextName, nextPasswordHash, nextActive, userId, req.user.tenant_id]
+      )
+      : await pool.query(
+        `UPDATE users
+         SET name = $1, password_hash = $2, active = $3
+         WHERE id::text = $4
+         RETURNING *`,
+        [nextName, nextPasswordHash, nextActive, userId]
+      );
 
     res.json(sanitizeUser(result.rows[0]));
   } catch (error) {
@@ -282,16 +512,19 @@ app.patch('/api/users/:id', authenticateToken, requireRole('admin'), async (req,
   }
 });
 
-app.get('/api/compras', authenticateToken, async (req, res) => {
+app.get('/api/compras', authenticateToken, requireTenantScope, async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM compras ORDER BY mes DESC, id DESC');
+    const result = runtimeCapabilities.hasComprasTenantId
+      ? await pool.query('SELECT * FROM compras WHERE tenant_id = $1 ORDER BY mes DESC, id DESC', [req.user.tenant_id])
+      : await pool.query('SELECT * FROM compras ORDER BY mes DESC, id DESC');
+
     res.json(result.rows);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-app.post('/api/compras', authenticateToken, async (req, res) => {
+app.post('/api/compras', authenticateToken, requireTenantScope, async (req, res) => {
   const { item, quantidade, valor, mes } = req.body;
   const quantidadeNumerica = parseAmount(quantidade);
   const valorNumerico = parseAmount(valor);
@@ -303,26 +536,50 @@ app.post('/api/compras', authenticateToken, async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const result = await client.query(
-      'INSERT INTO compras (item, quantidade, valor, mes) VALUES ($1, $2, $3, $4) RETURNING *',
-      [item, quantidadeNumerica, valorNumerico, mes]
-    );
+    const result = runtimeCapabilities.hasComprasTenantId
+      ? await client.query(
+        'INSERT INTO compras (tenant_id, item, quantidade, valor, mes) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+        [req.user.tenant_id, item, quantidadeNumerica, valorNumerico, mes]
+      )
+      : await client.query(
+        'INSERT INTO compras (item, quantidade, valor, mes) VALUES ($1, $2, $3, $4) RETURNING *',
+        [item, quantidadeNumerica, valorNumerico, mes]
+      );
 
-    const estoqueExistente = await client.query(
-      'SELECT * FROM estoque WHERE LOWER(item) = LOWER($1)',
-      [item]
-    );
+    const estoqueExistente = runtimeCapabilities.hasEstoqueTenantId
+      ? await client.query(
+        'SELECT * FROM estoque WHERE tenant_id = $1 AND LOWER(item) = LOWER($2)',
+        [req.user.tenant_id, item]
+      )
+      : await client.query(
+        'SELECT * FROM estoque WHERE LOWER(item) = LOWER($1)',
+        [item]
+      );
 
     if (estoqueExistente.rows.length > 0) {
-      await client.query(
-        'UPDATE estoque SET quantidade = quantidade + $1, updated_at = CURRENT_TIMESTAMP WHERE LOWER(item) = LOWER($2)',
-        [quantidadeNumerica, item]
-      );
+      if (runtimeCapabilities.hasEstoqueTenantId) {
+        await client.query(
+          'UPDATE estoque SET quantidade = quantidade + $1, updated_at = CURRENT_TIMESTAMP WHERE tenant_id = $2 AND LOWER(item) = LOWER($3)',
+          [quantidadeNumerica, req.user.tenant_id, item]
+        );
+      } else {
+        await client.query(
+          'UPDATE estoque SET quantidade = quantidade + $1, updated_at = CURRENT_TIMESTAMP WHERE LOWER(item) = LOWER($2)',
+          [quantidadeNumerica, item]
+        );
+      }
     } else {
-      await client.query(
-        'INSERT INTO estoque (item, quantidade) VALUES ($1, $2)',
-        [item, quantidadeNumerica]
-      );
+      if (runtimeCapabilities.hasEstoqueTenantId) {
+        await client.query(
+          'INSERT INTO estoque (tenant_id, item, quantidade) VALUES ($1, $2, $3)',
+          [req.user.tenant_id, item, quantidadeNumerica]
+        );
+      } else {
+        await client.query(
+          'INSERT INTO estoque (item, quantidade) VALUES ($1, $2)',
+          [item, quantidadeNumerica]
+        );
+      }
     }
 
     await client.query('COMMIT');
@@ -335,25 +592,33 @@ app.post('/api/compras', authenticateToken, async (req, res) => {
   }
 });
 
-app.delete('/api/compras/:id', authenticateToken, requireRole('admin'), async (req, res) => {
+app.delete('/api/compras/:id', authenticateToken, requireTenantScope, requireRole('admin'), async (req, res) => {
   try {
-    await pool.query('DELETE FROM compras WHERE id = $1', [req.params.id]);
+    if (runtimeCapabilities.hasComprasTenantId) {
+      await pool.query('DELETE FROM compras WHERE id::text = $1 AND tenant_id = $2', [req.params.id, req.user.tenant_id]);
+    } else {
+      await pool.query('DELETE FROM compras WHERE id::text = $1', [req.params.id]);
+    }
+
     res.json({ message: 'Compra excluída com sucesso' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-app.get('/api/contas', authenticateToken, async (req, res) => {
+app.get('/api/contas', authenticateToken, requireTenantScope, async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM contas ORDER BY mes DESC, id DESC');
+    const result = runtimeCapabilities.hasContasTenantId
+      ? await pool.query('SELECT * FROM contas WHERE tenant_id = $1 ORDER BY mes DESC, id DESC', [req.user.tenant_id])
+      : await pool.query('SELECT * FROM contas ORDER BY mes DESC, id DESC');
+
     res.json(result.rows);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-app.post('/api/contas', authenticateToken, async (req, res) => {
+app.post('/api/contas', authenticateToken, requireTenantScope, async (req, res) => {
   const { tipo, valor, mes } = req.body;
   const valorNumerico = parseAmount(valor);
 
@@ -362,35 +627,49 @@ app.post('/api/contas', authenticateToken, async (req, res) => {
   }
 
   try {
-    const result = await pool.query(
-      'INSERT INTO contas (tipo, valor, mes) VALUES ($1, $2, $3) RETURNING *',
-      [tipo, valorNumerico, mes]
-    );
+    const result = runtimeCapabilities.hasContasTenantId
+      ? await pool.query(
+        'INSERT INTO contas (tenant_id, tipo, valor, mes) VALUES ($1, $2, $3, $4) RETURNING *',
+        [req.user.tenant_id, tipo, valorNumerico, mes]
+      )
+      : await pool.query(
+        'INSERT INTO contas (tipo, valor, mes) VALUES ($1, $2, $3) RETURNING *',
+        [tipo, valorNumerico, mes]
+      );
+
     res.status(201).json(result.rows[0]);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-app.delete('/api/contas/:id', authenticateToken, requireRole('admin'), async (req, res) => {
+app.delete('/api/contas/:id', authenticateToken, requireTenantScope, requireRole('admin'), async (req, res) => {
   try {
-    await pool.query('DELETE FROM contas WHERE id = $1', [req.params.id]);
+    if (runtimeCapabilities.hasContasTenantId) {
+      await pool.query('DELETE FROM contas WHERE id::text = $1 AND tenant_id = $2', [req.params.id, req.user.tenant_id]);
+    } else {
+      await pool.query('DELETE FROM contas WHERE id::text = $1', [req.params.id]);
+    }
+
     res.json({ message: 'Conta excluída com sucesso' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-app.get('/api/manutencoes', authenticateToken, async (req, res) => {
+app.get('/api/manutencoes', authenticateToken, requireTenantScope, async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM manutencoes ORDER BY data DESC, id DESC');
+    const result = runtimeCapabilities.hasManutencoesTenantId
+      ? await pool.query('SELECT * FROM manutencoes WHERE tenant_id = $1 ORDER BY data DESC, id DESC', [req.user.tenant_id])
+      : await pool.query('SELECT * FROM manutencoes ORDER BY data DESC, id DESC');
+
     res.json(result.rows);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-app.post('/api/manutencoes', authenticateToken, async (req, res) => {
+app.post('/api/manutencoes', authenticateToken, requireTenantScope, async (req, res) => {
   const { descricao, valor, data } = req.body;
   const valorNumerico = parseAmount(valor);
 
@@ -399,35 +678,49 @@ app.post('/api/manutencoes', authenticateToken, async (req, res) => {
   }
 
   try {
-    const result = await pool.query(
-      'INSERT INTO manutencoes (descricao, valor, data) VALUES ($1, $2, $3) RETURNING *',
-      [descricao, valorNumerico, data]
-    );
+    const result = runtimeCapabilities.hasManutencoesTenantId
+      ? await pool.query(
+        'INSERT INTO manutencoes (tenant_id, descricao, valor, data) VALUES ($1, $2, $3, $4) RETURNING *',
+        [req.user.tenant_id, descricao, valorNumerico, data]
+      )
+      : await pool.query(
+        'INSERT INTO manutencoes (descricao, valor, data) VALUES ($1, $2, $3) RETURNING *',
+        [descricao, valorNumerico, data]
+      );
+
     res.status(201).json(result.rows[0]);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-app.delete('/api/manutencoes/:id', authenticateToken, requireRole('admin'), async (req, res) => {
+app.delete('/api/manutencoes/:id', authenticateToken, requireTenantScope, requireRole('admin'), async (req, res) => {
   try {
-    await pool.query('DELETE FROM manutencoes WHERE id = $1', [req.params.id]);
+    if (runtimeCapabilities.hasManutencoesTenantId) {
+      await pool.query('DELETE FROM manutencoes WHERE id::text = $1 AND tenant_id = $2', [req.params.id, req.user.tenant_id]);
+    } else {
+      await pool.query('DELETE FROM manutencoes WHERE id::text = $1', [req.params.id]);
+    }
+
     res.json({ message: 'Manutenção excluída com sucesso' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-app.get('/api/estoque', authenticateToken, async (req, res) => {
+app.get('/api/estoque', authenticateToken, requireTenantScope, async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM estoque WHERE quantidade > 0 ORDER BY item');
+    const result = runtimeCapabilities.hasEstoqueTenantId
+      ? await pool.query('SELECT * FROM estoque WHERE tenant_id = $1 AND quantidade > 0 ORDER BY item', [req.user.tenant_id])
+      : await pool.query('SELECT * FROM estoque WHERE quantidade > 0 ORDER BY item');
+
     res.json(result.rows);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-app.patch('/api/estoque/:id/baixa', authenticateToken, async (req, res) => {
+app.patch('/api/estoque/:id/baixa', authenticateToken, requireTenantScope, async (req, res) => {
   const quantidadeNumerica = parseAmount(req.body.quantidade);
 
   if (quantidadeNumerica === null || quantidadeNumerica <= 0) {
@@ -435,7 +728,9 @@ app.patch('/api/estoque/:id/baixa', authenticateToken, async (req, res) => {
   }
 
   try {
-    const item = await pool.query('SELECT * FROM estoque WHERE id = $1', [req.params.id]);
+    const item = runtimeCapabilities.hasEstoqueTenantId
+      ? await pool.query('SELECT * FROM estoque WHERE id::text = $1 AND tenant_id = $2', [req.params.id, req.user.tenant_id])
+      : await pool.query('SELECT * FROM estoque WHERE id::text = $1', [req.params.id]);
 
     if (item.rows.length === 0) {
       return res.status(404).json({ error: 'Item não encontrado' });
@@ -448,12 +743,23 @@ app.patch('/api/estoque/:id/baixa', authenticateToken, async (req, res) => {
     const novaQuantidade = Number(item.rows[0].quantidade) - quantidadeNumerica;
 
     if (novaQuantidade === 0) {
-      await pool.query('DELETE FROM estoque WHERE id = $1', [req.params.id]);
+      if (runtimeCapabilities.hasEstoqueTenantId) {
+        await pool.query('DELETE FROM estoque WHERE id::text = $1 AND tenant_id = $2', [req.params.id, req.user.tenant_id]);
+      } else {
+        await pool.query('DELETE FROM estoque WHERE id::text = $1', [req.params.id]);
+      }
     } else {
-      await pool.query(
-        'UPDATE estoque SET quantidade = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-        [novaQuantidade, req.params.id]
-      );
+      if (runtimeCapabilities.hasEstoqueTenantId) {
+        await pool.query(
+          'UPDATE estoque SET quantidade = $1, updated_at = CURRENT_TIMESTAMP WHERE id::text = $2 AND tenant_id = $3',
+          [novaQuantidade, req.params.id, req.user.tenant_id]
+        );
+      } else {
+        await pool.query(
+          'UPDATE estoque SET quantidade = $1, updated_at = CURRENT_TIMESTAMP WHERE id::text = $2',
+          [novaQuantidade, req.params.id]
+        );
+      }
     }
 
     res.json({ message: 'Baixa realizada com sucesso' });
@@ -462,10 +768,113 @@ app.patch('/api/estoque/:id/baixa', authenticateToken, async (req, res) => {
   }
 });
 
+app.get('/api/platform/tenants', authenticateToken, requirePlatformAdmin, async (req, res) => {
+  if (!runtimeCapabilities.hasTenantsTable) {
+    return res.status(400).json({ error: 'Tabela tenants não está disponível neste ambiente' });
+  }
+
+  try {
+    const usersCountSql = runtimeCapabilities.hasUsersTenantId
+      ? `COALESCE((SELECT COUNT(*)::int FROM users u WHERE u.tenant_id = t.id), 0) AS users_count`
+      : '0::int AS users_count';
+
+    const result = await pool.query(
+      `SELECT t.id, t.name, t.slug, t.plan, t.subscription_status, t.created_at, ${usersCountSql}
+       FROM tenants t
+       ORDER BY t.created_at DESC, t.name ASC`
+    );
+
+    res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/platform/users', authenticateToken, requirePlatformAdmin, async (req, res) => {
+  try {
+    if (runtimeCapabilities.hasTenantsTable && runtimeCapabilities.hasUsersTenantId) {
+      const params = [];
+      let where = '';
+
+      if (typeof req.query.tenantId === 'string' && req.query.tenantId.trim()) {
+        params.push(req.query.tenantId.trim());
+        where = 'WHERE u.tenant_id::text = $1';
+      }
+
+      const result = await pool.query(
+        `SELECT u.id, u.name, u.email, u.role, u.active, u.created_at, u.tenant_id,
+                t.name AS tenant_name, t.slug AS tenant_slug
+         FROM users u
+         LEFT JOIN tenants t ON t.id = u.tenant_id
+         ${where}
+         ORDER BY u.created_at DESC, u.name ASC`,
+        params
+      );
+
+      return res.json(result.rows.map((row) => ({
+        ...sanitizeUser(row),
+        tenantName: row.tenant_name || null,
+        tenantSlug: row.tenant_slug || null
+      })));
+    }
+
+    const result = await pool.query('SELECT * FROM users ORDER BY created_at DESC, name ASC');
+    return res.json(result.rows.map((row) => ({ ...sanitizeUser(row), tenantName: null, tenantSlug: null })));
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/platform/users/:id', authenticateToken, requirePlatformAdmin, async (req, res) => {
+  try {
+    const targetId = String(req.params.id || '').trim();
+
+    if (!targetId) {
+      return res.status(400).json({ error: 'Identificador de usuário inválido' });
+    }
+
+    const result = await pool.query('DELETE FROM users WHERE id::text = $1 RETURNING id', [targetId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Usuário não encontrado' });
+    }
+
+    return res.json({ message: 'Usuário removido com sucesso' });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/platform/tenants/:id', authenticateToken, requirePlatformAdmin, async (req, res) => {
+  if (!runtimeCapabilities.hasTenantsTable) {
+    return res.status(400).json({ error: 'Tabela tenants não está disponível neste ambiente' });
+  }
+
+  try {
+    const targetId = String(req.params.id || '').trim();
+
+    if (!targetId) {
+      return res.status(400).json({ error: 'Identificador de tenant inválido' });
+    }
+
+    const result = await pool.query('DELETE FROM tenants WHERE id::text = $1 RETURNING id', [targetId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Tenant não encontrado' });
+    }
+
+    return res.json({ message: 'Tenant removido com sucesso' });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 const startServer = async () => {
   try {
     await ensureSchema();
+    await discoverCapabilities();
     await ensureAdminUser();
+    await ensurePlatformAdminUser();
 
     app.listen(port, () => {
       console.log(`Backend rodando na porta ${port}`);

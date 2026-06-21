@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   AlertCircle,
   BarChart3,
+  Building2,
   CheckCircle2,
   DollarSign,
   LogIn,
@@ -12,6 +13,7 @@ import {
   ShoppingCart,
   UserPlus,
   Users,
+  Trash2,
   Wrench,
   XCircle
 } from 'lucide-react';
@@ -41,6 +43,7 @@ const tabs = [
 ];
 
 const adminTabs = [{ key: 'admin', label: 'Portal Admin', icon: Shield }];
+const platformTabs = [{ key: 'platform', label: 'Plataforma', icon: Building2 }];
 
 const formatCurrency = (value) => currencyFormatter.format(Number(value) || 0);
 
@@ -142,6 +145,8 @@ const FinanceApp = () => {
   const [manutencoes, setManutencoes] = useState([]);
   const [estoque, setEstoque] = useState([]);
   const [usuarios, setUsuarios] = useState([]);
+  const [platformTenants, setPlatformTenants] = useState([]);
+  const [platformUsers, setPlatformUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [sessionLoading, setSessionLoading] = useState(Boolean(token));
   const [errorMessage, setErrorMessage] = useState('');
@@ -158,7 +163,8 @@ const FinanceApp = () => {
   const [mesFiltroManutencoes, setMesFiltroManutencoes] = useState(defaultMonth);
   const [baixasEstoque, setBaixasEstoque] = useState({});
 
-  const isAdmin = user?.role === 'admin' || user?.role === 'owner';
+  const isPlatformAdmin = user?.scope === 'platform' || user?.role === 'super_admin';
+  const isAdmin = !isPlatformAdmin && (user?.role === 'admin' || user?.role === 'owner');
 
   const apiFetch = async (path, options = {}) => {
     const headers = {
@@ -198,7 +204,26 @@ const FinanceApp = () => {
     setSuccessMessage('');
   };
 
-  const loadProtectedData = async (shouldLoadUsers = isAdmin) => {
+  const loadProtectedData = async (sessionUser = user) => {
+    const isPlatformScope = sessionUser?.scope === 'platform' || sessionUser?.role === 'super_admin';
+
+    if (isPlatformScope) {
+      const [tenantsData, usersData] = await Promise.all([
+        apiFetch('/platform/tenants'),
+        apiFetch('/platform/users')
+      ]);
+
+      setPlatformTenants(tenantsData);
+      setPlatformUsers(usersData);
+      setCompras([]);
+      setContas([]);
+      setManutencoes([]);
+      setEstoque([]);
+      setUsuarios([]);
+      return;
+    }
+
+    const shouldLoadUsers = sessionUser?.role === 'admin' || sessionUser?.role === 'owner';
     const requests = [
       apiFetch('/compras'),
       apiFetch('/contas'),
@@ -222,6 +247,9 @@ const FinanceApp = () => {
     } else {
       setUsuarios([]);
     }
+
+    setPlatformTenants([]);
+    setPlatformUsers([]);
   };
 
   useEffect(() => {
@@ -234,7 +262,8 @@ const FinanceApp = () => {
       try {
         const session = await apiFetch('/auth/me');
         setUser(session.user);
-        await loadProtectedData(session.user.role === 'admin');
+        setActiveTab(session.user.scope === 'platform' ? 'platform' : 'compras');
+        await loadProtectedData(session.user);
       } catch (error) {
         setErrorMessage(normalizeError(error));
       } finally {
@@ -254,6 +283,8 @@ const FinanceApp = () => {
     setManutencoes([]);
     setEstoque([]);
     setUsuarios([]);
+    setPlatformTenants([]);
+    setPlatformUsers([]);
     clearMessages();
   };
 
@@ -271,7 +302,8 @@ const FinanceApp = () => {
       localStorage.setItem(TOKEN_STORAGE_KEY, data.token);
       setToken(data.token);
       setUser(data.user);
-      await loadProtectedData(data.user.role === 'admin');
+      setActiveTab(data.user.scope === 'platform' ? 'platform' : 'compras');
+      await loadProtectedData(data.user);
       setLoginForm({ email: '', password: '' });
       setSuccessMessage(`Sessão iniciada como ${data.user.name}`);
     } catch (error) {
@@ -387,6 +419,18 @@ const FinanceApp = () => {
       });
       setSenhaResetUsuario((current) => ({ ...current, [userId]: '' }));
     }, successText);
+  };
+
+  const excluirUsuarioPlataforma = async (userId) => {
+    await runMutation(async () => {
+      await apiFetch(`/platform/users/${userId}`, { method: 'DELETE' });
+    }, 'Usuário removido da plataforma com sucesso');
+  };
+
+  const excluirTenantPlataforma = async (tenantId) => {
+    await runMutation(async () => {
+      await apiFetch(`/platform/tenants/${tenantId}`, { method: 'DELETE' });
+    }, 'Tenant removido com sucesso');
   };
 
   const relatorio = useMemo(() => {
@@ -527,7 +571,9 @@ const FinanceApp = () => {
               <p className="text-sm uppercase tracking-[0.28em] text-emerald-300">Finansam</p>
               <h1 className="mt-3 text-4xl font-black tracking-tight">Operação diária e governança do proprietário em um único painel.</h1>
               <p className="mt-4 max-w-2xl text-base leading-7 text-slate-300">
-                Sessão autenticada para {user.name}. Usuários comuns podem operar registros e estoque. O proprietário controla acessos, estado das contas e credenciais operacionais.
+                {isPlatformAdmin
+                  ? `Sessão global autenticada para ${user.name}. Este painel governa tenants e usuários da plataforma inteira.`
+                  : `Sessão autenticada para ${user.name}. Usuários comuns podem operar registros e estoque. O proprietário controla acessos, estado das contas e credenciais operacionais.`}
               </p>
             </div>
             <div className="grid gap-4 rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur">
@@ -538,7 +584,7 @@ const FinanceApp = () => {
               </div>
               <div className="flex flex-wrap items-center gap-3">
                 <span className={`rounded-full px-3 py-1 text-sm font-semibold ${isAdmin ? 'bg-emerald-400/15 text-emerald-200' : 'bg-sky-400/15 text-sky-200'}`}>
-                  {isAdmin ? 'Proprietário / Admin' : 'Usuário operacional'}
+                  {isPlatformAdmin ? 'Super Admin da Plataforma' : isAdmin ? 'Proprietário / Admin' : 'Usuário operacional'}
                 </span>
                 <button
                   type="button"
@@ -568,7 +614,7 @@ const FinanceApp = () => {
         )}
 
         <nav className="mb-6 flex flex-wrap gap-3 rounded-[28px] bg-white p-3 shadow-lg shadow-slate-200/70">
-          {[...tabs, ...(isAdmin ? adminTabs : [])].map((tab) => {
+          {(isPlatformAdmin ? platformTabs : [...tabs, ...(isAdmin ? adminTabs : [])]).map((tab) => {
             const Icon = tab.icon;
             const active = activeTab === tab.key;
 
@@ -873,6 +919,102 @@ const FinanceApp = () => {
                 </div>
               </div>
             )}
+
+            {activeTab === 'platform' && isPlatformAdmin && (
+              <div>
+                <SectionHeader title="Administração da Plataforma" description="Gerencie empresas (tenants) e usuários globais da ferramenta." />
+
+                <div className="mt-6 rounded-3xl border border-slate-200 bg-white shadow-sm">
+                  <div className="border-b border-slate-200 px-5 py-4">
+                    <h3 className="text-lg font-bold">Tenants cadastrados</h3>
+                  </div>
+                  <div className="overflow-x-auto px-5 py-4">
+                    <table className="min-w-full text-left text-sm">
+                      <thead className="text-slate-500">
+                        <tr>
+                          <th className="pb-3 pr-4 font-semibold">Nome</th>
+                          <th className="pb-3 pr-4 font-semibold">Slug</th>
+                          <th className="pb-3 pr-4 font-semibold">Plano</th>
+                          <th className="pb-3 pr-4 font-semibold">Status</th>
+                          <th className="pb-3 pr-4 font-semibold">Usuários</th>
+                          <th className="pb-3 pr-4 font-semibold">Ações</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {platformTenants.map((tenant) => (
+                          <tr key={tenant.id} className="border-t border-slate-100 align-top">
+                            <td className="py-4 pr-4 font-semibold text-slate-800">{tenant.name}</td>
+                            <td className="py-4 pr-4 text-slate-600">{tenant.slug}</td>
+                            <td className="py-4 pr-4 text-slate-600">{tenant.plan || '-'}</td>
+                            <td className="py-4 pr-4 text-slate-600">{tenant.subscription_status || '-'}</td>
+                            <td className="py-4 pr-4 text-slate-600">{tenant.users_count ?? 0}</td>
+                            <td className="py-4 pr-4">
+                              <button
+                                type="button"
+                                onClick={() => excluirTenantPlataforma(tenant.id)}
+                                className="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-3 py-2 font-semibold text-white transition hover:bg-rose-700"
+                              >
+                                <Trash2 size={14} /> Excluir tenant
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                        {platformTenants.length === 0 && (
+                          <tr>
+                            <td className="py-5 text-center text-slate-500" colSpan={6}>Nenhum tenant encontrado</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="mt-6 rounded-3xl border border-slate-200 bg-white shadow-sm">
+                  <div className="border-b border-slate-200 px-5 py-4">
+                    <h3 className="text-lg font-bold">Usuários da plataforma</h3>
+                  </div>
+                  <div className="overflow-x-auto px-5 py-4">
+                    <table className="min-w-full text-left text-sm">
+                      <thead className="text-slate-500">
+                        <tr>
+                          <th className="pb-3 pr-4 font-semibold">Nome</th>
+                          <th className="pb-3 pr-4 font-semibold">E-mail</th>
+                          <th className="pb-3 pr-4 font-semibold">Papel</th>
+                          <th className="pb-3 pr-4 font-semibold">Tenant</th>
+                          <th className="pb-3 pr-4 font-semibold">Status</th>
+                          <th className="pb-3 pr-4 font-semibold">Ações</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {platformUsers.map((registeredUser) => (
+                          <tr key={registeredUser.id} className="border-t border-slate-100 align-top">
+                            <td className="py-4 pr-4 font-semibold text-slate-800">{registeredUser.name}</td>
+                            <td className="py-4 pr-4 text-slate-600">{registeredUser.email}</td>
+                            <td className="py-4 pr-4 text-slate-600">{registeredUser.role}</td>
+                            <td className="py-4 pr-4 text-slate-600">{registeredUser.tenantName || '-'}</td>
+                            <td className="py-4 pr-4 text-slate-600">{registeredUser.active ? 'Ativo' : 'Inativo'}</td>
+                            <td className="py-4 pr-4">
+                              <button
+                                type="button"
+                                onClick={() => excluirUsuarioPlataforma(registeredUser.id)}
+                                className="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-3 py-2 font-semibold text-white transition hover:bg-rose-700"
+                              >
+                                <Trash2 size={14} /> Excluir usuário
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                        {platformUsers.length === 0 && (
+                          <tr>
+                            <td className="py-5 text-center text-slate-500" colSpan={6}>Nenhum usuário encontrado</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <aside className="space-y-6">
@@ -884,6 +1026,8 @@ const FinanceApp = () => {
                 <SummaryRow label="Manutenções" value={String(manutencoes.length)} />
                 <SummaryRow label="Itens em estoque" value={String(estoque.length)} />
                 {isAdmin && <SummaryRow label="Usuários ativos" value={String(usuarios.filter((registeredUser) => registeredUser.active).length)} />}
+                {isPlatformAdmin && <SummaryRow label="Tenants" value={String(platformTenants.length)} />}
+                {isPlatformAdmin && <SummaryRow label="Usuários globais" value={String(platformUsers.length)} />}
               </div>
             </div>
 
@@ -892,6 +1036,7 @@ const FinanceApp = () => {
               <div className="mt-4 space-y-4 text-sm leading-6 text-slate-700">
                 <p>Usuário operacional: cria compras, contas, manutenções e realiza baixa de estoque.</p>
                 <p>Proprietário: além do fluxo operacional, gerencia usuários e exclusões críticas.</p>
+                <p>Super admin da plataforma: gerencia tenants e pode excluir usuários e empresas inteiras.</p>
               </div>
             </div>
           </aside>

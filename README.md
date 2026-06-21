@@ -15,6 +15,12 @@ O projeto agora cobre os três pontos pedidos:
 - `admin`: proprietário da ferramenta. Pode acessar o portal administrativo, gerenciar usuários e excluir compras, contas e manutenções.
 - `user`: usuário operacional. Pode criar compras, contas, manutenções e registrar baixa de estoque.
 
+### Administração global da plataforma
+
+- `super_admin`: usuário global da ferramenta (fora do tenant). Pode listar e excluir tenants, além de remover usuários de qualquer tenant.
+- O super admin acessa a aba `Plataforma` no frontend.
+- As ações globais usam endpoints dedicados em `/api/platform/*`.
+
 Existe somente um administrador proprietário. Usuários adicionais sempre são criados como `user`.
 
 ## Credenciais iniciais do administrador
@@ -25,6 +31,17 @@ As credenciais iniciais são semeadas pelo backend na primeira subida da aplica�
 - `ADMIN_EMAIL`
 - `ADMIN_PASSWORD`
 - `JWT_SECRET`
+
+Para o administrador global da plataforma:
+
+- `PLATFORM_ADMIN_NAME`
+- `PLATFORM_ADMIN_EMAIL`
+- `PLATFORM_ADMIN_PASSWORD`
+
+Quando o esquema multi-tenant estiver ativo:
+
+- `ADMIN_TENANT_NAME`
+- `ADMIN_TENANT_SLUG`
 
 Troque esses valores antes de qualquer uso real.
 

@@ -37,6 +37,11 @@ services:
       ADMIN_NAME: Finansam
       ADMIN_EMAIL: finansam@smcorp.com.br
       ADMIN_PASSWORD: Smcorp1234*
+      ADMIN_TENANT_NAME: Finansam
+      ADMIN_TENANT_SLUG: finansam
+      PLATFORM_ADMIN_NAME: Platform Root
+      PLATFORM_ADMIN_EMAIL: platform@smcorp.com.br
+      PLATFORM_ADMIN_PASSWORD: Smcorp1234*
     ports:
       - "3001:3001"
     depends_on:
