@@ -5,7 +5,23 @@ WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'controle_contas')\gex
 -- Conectar ao banco
 \c controle_contas
 
+-- Extensoes utilitarias
+CREATE EXTENSION IF NOT EXISTS citext;
+
 -- Criação das tabelas do sistema de controle de contas
+
+-- Tabela de usuários
+CREATE TABLE IF NOT EXISTS users (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    email CITEXT NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    role VARCHAR(20) NOT NULL CHECK (role IN ('admin', 'user')),
+    active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_single_admin ON users (role) WHERE role = 'admin';
 
 -- Tabela de compras
 CREATE TABLE IF NOT EXISTS compras (
@@ -16,8 +32,6 @@ CREATE TABLE IF NOT EXISTS compras (
     mes VARCHAR(7) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-
--- Resto do arquivo continua igual...
 
 -- Tabela de contas fixas
 CREATE TABLE IF NOT EXISTS contas (
@@ -46,6 +60,7 @@ CREATE TABLE IF NOT EXISTS estoque (
 );
 
 -- Índices para melhorar performance
+CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
 CREATE INDEX IF NOT EXISTS idx_compras_mes ON compras(mes);
 CREATE INDEX IF NOT EXISTS idx_contas_mes ON contas(mes);
 CREATE INDEX IF NOT EXISTS idx_manutencoes_data ON manutencoes(data);
