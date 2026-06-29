@@ -270,6 +270,15 @@ const discoverCapabilities = async () => {
   runtimeCapabilities.hasEstoqueTenantId = estoqueTenantResult.rows[0]?.has_estoque_tenant_id === true;
 };
 
+const hasPasswordChanged = async (plainPassword, passwordHash) => {
+  if (!passwordHash) {
+    return true;
+  }
+
+  const passwordMatches = await bcrypt.compare(plainPassword, passwordHash);
+  return !passwordMatches;
+};
+
 const ensureAdminUser = async () => {
   if (runtimeCapabilities.hasUsersTenantId) {
     if (!runtimeCapabilities.hasTenantsTable) {
@@ -287,11 +296,37 @@ const ensureAdminUser = async () => {
     const tenantId = tenantResult.rows[0].id;
 
     const existingAdmin = await pool.query(
-      'SELECT id FROM users WHERE tenant_id = $1 AND role IN ($2, $3) LIMIT 1',
+      'SELECT id, name, email, password_hash, active FROM users WHERE tenant_id = $1 AND role IN ($2, $3) LIMIT 1',
       [tenantId, 'admin', 'owner']
     );
 
     if (existingAdmin.rows.length > 0) {
+      const adminUser = existingAdmin.rows[0];
+      const passwordNeedsUpdate = await hasPasswordChanged(adminPassword, adminUser.password_hash);
+
+      if (
+        adminUser.name !== adminName
+        || adminUser.email !== adminEmail
+        || adminUser.active !== true
+        || passwordNeedsUpdate
+      ) {
+        const nextPasswordHash = passwordNeedsUpdate
+          ? await bcrypt.hash(adminPassword, 10)
+          : adminUser.password_hash;
+
+        await pool.query(
+          `UPDATE users
+           SET name = $1,
+               email = $2,
+               password_hash = $3,
+               active = true
+           WHERE id = $4`,
+          [adminName, adminEmail, nextPasswordHash, adminUser.id]
+        );
+
+        console.log(`Administrador do tenant sincronizado: ${adminEmail}`);
+      }
+
       return;
     }
 
@@ -308,11 +343,37 @@ const ensureAdminUser = async () => {
   }
 
   const existingAdmin = await pool.query(
-    'SELECT id FROM users WHERE role IN ($1, $2) LIMIT 1',
+    'SELECT id, name, email, password_hash, active FROM users WHERE role IN ($1, $2) LIMIT 1',
     ['admin', 'owner']
   );
 
   if (existingAdmin.rows.length > 0) {
+    const adminUser = existingAdmin.rows[0];
+    const passwordNeedsUpdate = await hasPasswordChanged(adminPassword, adminUser.password_hash);
+
+    if (
+      adminUser.name !== adminName
+      || adminUser.email !== adminEmail
+      || adminUser.active !== true
+      || passwordNeedsUpdate
+    ) {
+      const nextPasswordHash = passwordNeedsUpdate
+        ? await bcrypt.hash(adminPassword, 10)
+        : adminUser.password_hash;
+
+      await pool.query(
+        `UPDATE users
+         SET name = $1,
+             email = $2,
+             password_hash = $3,
+             active = true
+         WHERE id = $4`,
+        [adminName, adminEmail, nextPasswordHash, adminUser.id]
+      );
+
+      console.log(`Administrador sincronizado: ${adminEmail}`);
+    }
+
     return;
   }
 
@@ -327,9 +388,37 @@ const ensureAdminUser = async () => {
 };
 
 const ensurePlatformAdminUser = async () => {
-  const existingPlatformAdmin = await pool.query('SELECT id FROM platform_users LIMIT 1');
+  const existingPlatformAdmin = await pool.query(
+    'SELECT id, name, email, password_hash, active FROM platform_users LIMIT 1'
+  );
 
   if (existingPlatformAdmin.rows.length > 0) {
+    const platformUser = existingPlatformAdmin.rows[0];
+    const passwordNeedsUpdate = await hasPasswordChanged(platformAdminPassword, platformUser.password_hash);
+
+    if (
+      platformUser.name !== platformAdminName
+      || platformUser.email !== platformAdminEmail
+      || platformUser.active !== true
+      || passwordNeedsUpdate
+    ) {
+      const nextPasswordHash = passwordNeedsUpdate
+        ? await bcrypt.hash(platformAdminPassword, 10)
+        : platformUser.password_hash;
+
+      await pool.query(
+        `UPDATE platform_users
+         SET name = $1,
+             email = $2,
+             password_hash = $3,
+             active = true
+         WHERE id = $4`,
+        [platformAdminName, platformAdminEmail, nextPasswordHash, platformUser.id]
+      );
+
+      console.log(`Super admin da plataforma sincronizado: ${platformAdminEmail}`);
+    }
+
     return;
   }
 
