@@ -8,6 +8,7 @@ import {
   LogIn,
   LogOut,
   Package,
+  Pencil,
   PlusCircle,
   Shield,
   ShoppingCart,
@@ -20,6 +21,8 @@ import {
 
 const API_BASE = '/api';
 const TOKEN_STORAGE_KEY = 'finansam-auth-token';
+const TENANT_VIEW_STORAGE_KEY = 'finansam-platform-tenant-view';
+const MONTHLY_VIEW_STORAGE_KEY = 'finansam-monthly-view';
 
 const defaultMonth = new Date().toISOString().slice(0, 7);
 const defaultDate = new Date().toISOString().slice(0, 10);
@@ -28,6 +31,74 @@ const emptyCompra = () => ({ item: '', quantidade: '', valor: '', mes: defaultMo
 const emptyConta = () => ({ tipo: 'Água', valor: '', mes: defaultMonth });
 const emptyManutencao = () => ({ descricao: '', valor: '', data: defaultDate });
 const emptyNovoUsuario = () => ({ name: '', email: '', password: '' });
+const emptyTenantForm = () => ({ name: '', slug: '', plan: 'starter', subscriptionStatus: 'active' });
+const defaultTenantSort = () => ({ key: 'name', direction: 'asc' });
+const isMonthValueValid = (value) => /^\d{4}-\d{2}$/.test(String(value || ''));
+
+const readTenantViewPreferences = () => {
+  try {
+    const raw = localStorage.getItem(TENANT_VIEW_STORAGE_KEY);
+
+    if (!raw) {
+      return {
+        planFilter: 'all',
+        statusFilter: 'all',
+        searchTerm: '',
+        sortConfig: defaultTenantSort()
+      };
+    }
+
+    const parsed = JSON.parse(raw);
+    const allowedKeys = ['name', 'plan', 'subscription_status'];
+    const nextKey = allowedKeys.includes(parsed?.sortConfig?.key) ? parsed.sortConfig.key : 'name';
+    const nextDirection = parsed?.sortConfig?.direction === 'desc' ? 'desc' : 'asc';
+
+    return {
+      planFilter: typeof parsed?.planFilter === 'string' ? parsed.planFilter : 'all',
+      statusFilter: typeof parsed?.statusFilter === 'string' ? parsed.statusFilter : 'all',
+      searchTerm: typeof parsed?.searchTerm === 'string' ? parsed.searchTerm : '',
+      sortConfig: { key: nextKey, direction: nextDirection }
+    };
+  } catch (_error) {
+    return {
+      planFilter: 'all',
+      statusFilter: 'all',
+      searchTerm: '',
+      sortConfig: defaultTenantSort()
+    };
+  }
+};
+
+const readMonthlyViewPreferences = () => {
+  try {
+    const raw = localStorage.getItem(MONTHLY_VIEW_STORAGE_KEY);
+
+    if (!raw) {
+      return {
+        reportMonth: defaultMonth,
+        comprasMonth: defaultMonth,
+        contasMonth: defaultMonth,
+        manutencoesMonth: defaultMonth
+      };
+    }
+
+    const parsed = JSON.parse(raw);
+
+    return {
+      reportMonth: isMonthValueValid(parsed?.reportMonth) ? parsed.reportMonth : defaultMonth,
+      comprasMonth: isMonthValueValid(parsed?.comprasMonth) ? parsed.comprasMonth : defaultMonth,
+      contasMonth: isMonthValueValid(parsed?.contasMonth) ? parsed.contasMonth : defaultMonth,
+      manutencoesMonth: isMonthValueValid(parsed?.manutencoesMonth) ? parsed.manutencoesMonth : defaultMonth
+    };
+  } catch (_error) {
+    return {
+      reportMonth: defaultMonth,
+      comprasMonth: defaultMonth,
+      contasMonth: defaultMonth,
+      manutencoesMonth: defaultMonth
+    };
+  }
+};
 
 const currencyFormatter = new Intl.NumberFormat('pt-BR', {
   style: 'currency',
@@ -137,6 +208,8 @@ const DataTable = ({ headers, rows, emptyMessage }) => (
 );
 
 const FinanceApp = () => {
+  const tenantViewPreferences = readTenantViewPreferences();
+  const monthlyViewPreferences = readMonthlyViewPreferences();
   const [token, setToken] = useState(() => localStorage.getItem(TOKEN_STORAGE_KEY) || '');
   const [user, setUser] = useState(null);
   const [activeTab, setActiveTab] = useState('compras');
@@ -157,11 +230,17 @@ const FinanceApp = () => {
   const [novaConta, setNovaConta] = useState(emptyConta());
   const [novaManutencao, setNovaManutencao] = useState(emptyManutencao());
   const [novoUsuario, setNovoUsuario] = useState(emptyNovoUsuario());
+  const [tenantForm, setTenantForm] = useState(emptyTenantForm());
+  const [editingTenantId, setEditingTenantId] = useState(null);
+  const [tenantPlanFilter, setTenantPlanFilter] = useState(tenantViewPreferences.planFilter);
+  const [tenantStatusFilter, setTenantStatusFilter] = useState(tenantViewPreferences.statusFilter);
+  const [tenantSearchTerm, setTenantSearchTerm] = useState(tenantViewPreferences.searchTerm);
+  const [tenantSortConfig, setTenantSortConfig] = useState(tenantViewPreferences.sortConfig);
   const [senhaResetUsuario, setSenhaResetUsuario] = useState({});
-  const [mesRelatorio, setMesRelatorio] = useState(defaultMonth);
-  const [mesFiltroCompras, setMesFiltroCompras] = useState(defaultMonth);
-  const [mesFiltroContas, setMesFiltroContas] = useState(defaultMonth);
-  const [mesFiltroManutencoes, setMesFiltroManutencoes] = useState(defaultMonth);
+  const [mesRelatorio, setMesRelatorio] = useState(monthlyViewPreferences.reportMonth);
+  const [mesFiltroCompras, setMesFiltroCompras] = useState(monthlyViewPreferences.comprasMonth);
+  const [mesFiltroContas, setMesFiltroContas] = useState(monthlyViewPreferences.contasMonth);
+  const [mesFiltroManutencoes, setMesFiltroManutencoes] = useState(monthlyViewPreferences.manutencoesMonth);
   const [baixasEstoque, setBaixasEstoque] = useState({});
 
   const isPlatformAdmin = user?.scope === 'platform' || user?.role === 'super_admin';
@@ -278,6 +357,30 @@ const FinanceApp = () => {
 
     bootstrap();
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem(
+      TENANT_VIEW_STORAGE_KEY,
+      JSON.stringify({
+        planFilter: tenantPlanFilter,
+        statusFilter: tenantStatusFilter,
+        searchTerm: tenantSearchTerm,
+        sortConfig: tenantSortConfig
+      })
+    );
+  }, [tenantPlanFilter, tenantStatusFilter, tenantSearchTerm, tenantSortConfig]);
+
+  useEffect(() => {
+    localStorage.setItem(
+      MONTHLY_VIEW_STORAGE_KEY,
+      JSON.stringify({
+        reportMonth: mesRelatorio,
+        comprasMonth: mesFiltroCompras,
+        contasMonth: mesFiltroContas,
+        manutencoesMonth: mesFiltroManutencoes
+      })
+    );
+  }, [mesRelatorio, mesFiltroCompras, mesFiltroContas, mesFiltroManutencoes]);
 
   const handleLogout = () => {
     localStorage.removeItem(TOKEN_STORAGE_KEY);
@@ -448,6 +551,57 @@ const FinanceApp = () => {
     }, 'Tenant removido com sucesso');
   };
 
+  const iniciarEdicaoTenant = (tenant) => {
+    setEditingTenantId(String(tenant.id));
+    setTenantForm({
+      name: tenant.name || '',
+      slug: tenant.slug || '',
+      plan: tenant.plan || 'starter',
+      subscriptionStatus: tenant.subscription_status || 'active'
+    });
+    clearMessages();
+  };
+
+  const cancelarEdicaoTenant = () => {
+    setEditingTenantId(null);
+    setTenantForm(emptyTenantForm());
+    clearMessages();
+  };
+
+  const salvarTenant = async () => {
+    const payload = {
+      name: tenantForm.name.trim(),
+      slug: tenantForm.slug.trim(),
+      plan: tenantForm.plan.trim(),
+      subscriptionStatus: tenantForm.subscriptionStatus.trim()
+    };
+
+    if (!payload.name || !payload.slug) {
+      setErrorMessage('Nome e slug do tenant são obrigatórios');
+      return;
+    }
+
+    if (editingTenantId) {
+      await runMutation(async () => {
+        await apiFetch(`/platform/tenants/${editingTenantId}`, {
+          method: 'PATCH',
+          body: JSON.stringify(payload)
+        });
+        setEditingTenantId(null);
+        setTenantForm(emptyTenantForm());
+      }, 'Tenant atualizado com sucesso');
+      return;
+    }
+
+    await runMutation(async () => {
+      await apiFetch('/platform/tenants', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+      setTenantForm(emptyTenantForm());
+    }, 'Tenant criado com sucesso');
+  };
+
   const excluirAdminPlataforma = async (adminId, adminEmail) => {
     const confirmation = window.prompt(`Para excluir este super admin, digite o e-mail exatamente: ${adminEmail}`);
 
@@ -489,6 +643,78 @@ const FinanceApp = () => {
       totalGeral
     };
   }, [compras, contas, manutencoes, mesRelatorio]);
+
+  const tenantPlanOptions = useMemo(() => {
+    const options = Array.from(new Set(
+      platformTenants
+        .map((tenant) => String(tenant.plan || '').trim())
+        .filter(Boolean)
+    ));
+
+    return options.sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }, [platformTenants]);
+
+  const tenantStatusOptions = useMemo(() => {
+    const options = Array.from(new Set(
+      platformTenants
+        .map((tenant) => String(tenant.subscription_status || '').trim())
+        .filter(Boolean)
+    ));
+
+    return options.sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }, [platformTenants]);
+
+  const filteredPlatformTenants = useMemo(() => {
+    const normalizedSearch = tenantSearchTerm.trim().toLowerCase();
+
+    const filtered = platformTenants.filter((tenant) => {
+      const plan = String(tenant.plan || '').trim();
+      const status = String(tenant.subscription_status || '').trim();
+      const name = String(tenant.name || '').toLowerCase();
+      const slug = String(tenant.slug || '').toLowerCase();
+
+      if (tenantPlanFilter !== 'all' && plan !== tenantPlanFilter) {
+        return false;
+      }
+
+      if (tenantStatusFilter !== 'all' && status !== tenantStatusFilter) {
+        return false;
+      }
+
+      if (normalizedSearch && !name.includes(normalizedSearch) && !slug.includes(normalizedSearch)) {
+        return false;
+      }
+
+      return true;
+    });
+
+    const sorted = [...filtered].sort((a, b) => {
+      const valueA = String(a[tenantSortConfig.key] || '').toLowerCase();
+      const valueB = String(b[tenantSortConfig.key] || '').toLowerCase();
+      const compare = valueA.localeCompare(valueB, 'pt-BR');
+      return tenantSortConfig.direction === 'asc' ? compare : -compare;
+    });
+
+    return sorted;
+  }, [platformTenants, tenantPlanFilter, tenantStatusFilter, tenantSearchTerm, tenantSortConfig]);
+
+  const toggleTenantSort = (key) => {
+    setTenantSortConfig((current) => {
+      if (current.key === key) {
+        return { key, direction: current.direction === 'asc' ? 'desc' : 'asc' };
+      }
+
+      return { key, direction: 'asc' };
+    });
+  };
+
+  const sortIndicator = (key) => {
+    if (tenantSortConfig.key !== key) {
+      return '↕';
+    }
+
+    return tenantSortConfig.direction === 'asc' ? '↑' : '↓';
+  };
 
   const distributionItems = [
     { label: 'Compras', total: relatorio.totalCompras, className: 'bg-blue-500' },
@@ -954,24 +1180,123 @@ const FinanceApp = () => {
               <div>
                 <SectionHeader title="Administração da Plataforma" description="Gerencie empresas (tenants) e usuários globais da ferramenta." />
 
+                <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-5">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <h3 className="text-lg font-bold">{editingTenantId ? 'Editar tenant' : 'Criar tenant'}</h3>
+                    {editingTenantId && (
+                      <button
+                        type="button"
+                        onClick={cancelarEdicaoTenant}
+                        className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                      >
+                        Cancelar edição
+                      </button>
+                    )}
+                  </div>
+                  <div className="mt-4 grid gap-3 md:grid-cols-4">
+                    <Field value={tenantForm.name} onChange={(value) => setTenantForm((current) => ({ ...current, name: value }))} placeholder="Nome do tenant" />
+                    <Field value={tenantForm.slug} onChange={(value) => setTenantForm((current) => ({ ...current, slug: value }))} placeholder="slug-do-tenant" />
+                    <Field value={tenantForm.plan} onChange={(value) => setTenantForm((current) => ({ ...current, plan: value }))} placeholder="Plano" />
+                    <Field value={tenantForm.subscriptionStatus} onChange={(value) => setTenantForm((current) => ({ ...current, subscriptionStatus: value }))} placeholder="Status" />
+                  </div>
+                  <div className="mt-4">
+                    <PrimaryButton
+                      icon={PlusCircle}
+                      onClick={salvarTenant}
+                      disabled={loading}
+                      label={editingTenantId ? 'Salvar alterações' : 'Criar tenant'}
+                    />
+                  </div>
+                </div>
+
                 <div className="mt-6 rounded-3xl border border-slate-200 bg-white shadow-sm">
                   <div className="border-b border-slate-200 px-5 py-4">
-                    <h3 className="text-lg font-bold">Tenants cadastrados</h3>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <h3 className="text-lg font-bold">Tenants cadastrados</h3>
+                      <span className="text-sm font-semibold text-slate-600">
+                        {filteredPlatformTenants.length} de {platformTenants.length} tenants
+                      </span>
+                    </div>
+                    <div className="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_1fr_auto]">
+                      <input
+                        type="text"
+                        value={tenantSearchTerm}
+                        onChange={(event) => setTenantSearchTerm(event.target.value)}
+                        placeholder="Buscar por nome ou slug"
+                        className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                      />
+                      <select
+                        value={tenantPlanFilter}
+                        onChange={(event) => setTenantPlanFilter(event.target.value)}
+                        className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                      >
+                        <option value="all">Todos os planos</option>
+                        {tenantPlanOptions.map((plan) => (
+                          <option key={plan} value={plan}>{plan}</option>
+                        ))}
+                      </select>
+                      <select
+                        value={tenantStatusFilter}
+                        onChange={(event) => setTenantStatusFilter(event.target.value)}
+                        className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                      >
+                        <option value="all">Todos os status</option>
+                        {tenantStatusOptions.map((status) => (
+                          <option key={status} value={status}>{status}</option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTenantSearchTerm('');
+                          setTenantPlanFilter('all');
+                          setTenantStatusFilter('all');
+                          setTenantSortConfig(defaultTenantSort());
+                        }}
+                        className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                      >
+                        Limpar filtros
+                      </button>
+                    </div>
                   </div>
                   <div className="overflow-x-auto px-5 py-4">
                     <table className="min-w-full text-left text-sm">
                       <thead className="text-slate-500">
                         <tr>
-                          <th className="pb-3 pr-4 font-semibold">Nome</th>
+                          <th className="pb-3 pr-4 font-semibold">
+                            <button
+                              type="button"
+                              onClick={() => toggleTenantSort('name')}
+                              className="inline-flex items-center gap-1 transition hover:text-slate-800"
+                            >
+                              Nome <span>{sortIndicator('name')}</span>
+                            </button>
+                          </th>
                           <th className="pb-3 pr-4 font-semibold">Slug</th>
-                          <th className="pb-3 pr-4 font-semibold">Plano</th>
-                          <th className="pb-3 pr-4 font-semibold">Status</th>
+                          <th className="pb-3 pr-4 font-semibold">
+                            <button
+                              type="button"
+                              onClick={() => toggleTenantSort('plan')}
+                              className="inline-flex items-center gap-1 transition hover:text-slate-800"
+                            >
+                              Plano <span>{sortIndicator('plan')}</span>
+                            </button>
+                          </th>
+                          <th className="pb-3 pr-4 font-semibold">
+                            <button
+                              type="button"
+                              onClick={() => toggleTenantSort('subscription_status')}
+                              className="inline-flex items-center gap-1 transition hover:text-slate-800"
+                            >
+                              Status <span>{sortIndicator('subscription_status')}</span>
+                            </button>
+                          </th>
                           <th className="pb-3 pr-4 font-semibold">Usuários</th>
                           <th className="pb-3 pr-4 font-semibold">Ações</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {platformTenants.map((tenant) => (
+                        {filteredPlatformTenants.map((tenant) => (
                           <tr key={tenant.id} className="border-t border-slate-100 align-top">
                             <td className="py-4 pr-4 font-semibold text-slate-800">{tenant.name}</td>
                             <td className="py-4 pr-4 text-slate-600">{tenant.slug}</td>
@@ -979,20 +1304,30 @@ const FinanceApp = () => {
                             <td className="py-4 pr-4 text-slate-600">{tenant.subscription_status || '-'}</td>
                             <td className="py-4 pr-4 text-slate-600">{tenant.users_count ?? 0}</td>
                             <td className="py-4 pr-4">
-                              <button
-                                type="button"
-                                onClick={() => excluirTenantPlataforma(tenant.id, tenant.slug)}
-                                disabled={tenant.is_protected || loading}
-                                className="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-3 py-2 font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
-                              >
-                                <Trash2 size={14} /> {tenant.is_protected ? 'Tenant protegido' : 'Excluir tenant'}
-                              </button>
+                              <div className="flex flex-wrap gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => iniciarEdicaoTenant(tenant)}
+                                  disabled={loading}
+                                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                  <Pencil size={14} /> Editar
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => excluirTenantPlataforma(tenant.id, tenant.slug)}
+                                  disabled={tenant.is_protected || loading}
+                                  className="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-3 py-2 font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                  <Trash2 size={14} /> {tenant.is_protected ? 'Tenant protegido' : 'Excluir tenant'}
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         ))}
-                        {platformTenants.length === 0 && (
+                        {filteredPlatformTenants.length === 0 && (
                           <tr>
-                            <td className="py-5 text-center text-slate-500" colSpan={6}>Nenhum tenant encontrado</td>
+                            <td className="py-5 text-center text-slate-500" colSpan={6}>Nenhum tenant encontrado com os filtros atuais</td>
                           </tr>
                         )}
                       </tbody>

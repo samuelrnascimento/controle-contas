@@ -73,6 +73,13 @@ const parseAmount = (value) => {
   return Number.isFinite(amount) ? amount : null;
 };
 
+const normalizeTenantSlug = (value) => String(value || '')
+  .trim()
+  .toLowerCase()
+  .replace(/[^a-z0-9-]+/g, '-')
+  .replace(/-{2,}/g, '-')
+  .replace(/^-+|-+$/g, '');
+
 const authenticateToken = async (req, res, next) => {
   const authHeader = req.headers.authorization || '';
   const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
@@ -878,6 +885,115 @@ app.get('/api/platform/tenants', authenticateToken, requirePlatformAdmin, async 
     res.json(result.rows);
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/platform/tenants', authenticateToken, requirePlatformAdmin, async (req, res) => {
+  if (!runtimeCapabilities.hasTenantsTable) {
+    return res.status(400).json({ error: 'Tabela tenants não está disponível neste ambiente' });
+  }
+
+  const name = String(req.body?.name || '').trim();
+  const slug = normalizeTenantSlug(req.body?.slug);
+  const plan = String(req.body?.plan || 'starter').trim() || 'starter';
+  const subscriptionStatus = String(req.body?.subscriptionStatus || 'active').trim() || 'active';
+
+  if (!name) {
+    return res.status(400).json({ error: 'Nome do tenant é obrigatório' });
+  }
+
+  if (!slug) {
+    return res.status(400).json({ error: 'Slug do tenant é obrigatório' });
+  }
+
+  if (!/^[a-z0-9-]{3,80}$/.test(slug)) {
+    return res.status(400).json({ error: 'Slug inválido. Use de 3 a 80 caracteres com letras minúsculas, números e hífen.' });
+  }
+
+  try {
+    const result = await pool.query(
+      `INSERT INTO tenants (name, slug, plan, subscription_status)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, name, slug, plan, subscription_status, created_at`,
+      [name, slug, plan, subscriptionStatus]
+    );
+
+    return res.status(201).json(result.rows[0]);
+  } catch (error) {
+    if (error.code === '23505') {
+      return res.status(409).json({ error: 'Já existe tenant com este slug' });
+    }
+
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+app.patch('/api/platform/tenants/:id', authenticateToken, requirePlatformAdmin, async (req, res) => {
+  if (!runtimeCapabilities.hasTenantsTable) {
+    return res.status(400).json({ error: 'Tabela tenants não está disponível neste ambiente' });
+  }
+
+  const targetId = String(req.params.id || '').trim();
+
+  if (!targetId) {
+    return res.status(400).json({ error: 'Identificador de tenant inválido' });
+  }
+
+  const nextName = req.body?.name !== undefined ? String(req.body.name).trim() : null;
+  const nextSlug = req.body?.slug !== undefined ? normalizeTenantSlug(req.body.slug) : null;
+  const nextPlan = req.body?.plan !== undefined ? (String(req.body.plan).trim() || null) : null;
+  const nextStatus = req.body?.subscriptionStatus !== undefined ? (String(req.body.subscriptionStatus).trim() || null) : null;
+
+  if (nextName !== null && !nextName) {
+    return res.status(400).json({ error: 'Nome do tenant não pode ficar vazio' });
+  }
+
+  if (nextSlug !== null && !nextSlug) {
+    return res.status(400).json({ error: 'Slug do tenant não pode ficar vazio' });
+  }
+
+  if (nextSlug !== null && !/^[a-z0-9-]{3,80}$/.test(nextSlug)) {
+    return res.status(400).json({ error: 'Slug inválido. Use de 3 a 80 caracteres com letras minúsculas, números e hífen.' });
+  }
+
+  if (nextName === null && nextSlug === null && nextPlan === null && nextStatus === null) {
+    return res.status(400).json({ error: 'Informe ao menos um campo para atualização' });
+  }
+
+  try {
+    const currentResult = await pool.query(
+      'SELECT id, slug FROM tenants WHERE id::text = $1 LIMIT 1',
+      [targetId]
+    );
+
+    if (currentResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Tenant não encontrado' });
+    }
+
+    const currentTenant = currentResult.rows[0];
+
+    if (currentTenant.slug === adminTenantSlug && nextSlug && nextSlug !== currentTenant.slug) {
+      return res.status(400).json({ error: 'O tenant padrão inicial tem slug protegido e não pode ser alterado' });
+    }
+
+    const result = await pool.query(
+      `UPDATE tenants
+       SET name = COALESCE($1, name),
+           slug = COALESCE($2, slug),
+           plan = COALESCE($3, plan),
+           subscription_status = COALESCE($4, subscription_status)
+       WHERE id::text = $5
+       RETURNING id, name, slug, plan, subscription_status, created_at`,
+      [nextName, nextSlug, nextPlan, nextStatus, targetId]
+    );
+
+    return res.json(result.rows[0]);
+  } catch (error) {
+    if (error.code === '23505') {
+      return res.status(409).json({ error: 'Já existe tenant com este slug' });
+    }
+
+    return res.status(500).json({ error: error.message });
   }
 });
 
