@@ -1443,15 +1443,6 @@ const FinanceApp = () => {
                 {isPlatformAdmin && <SummaryRow label="Super admins" value={String(platformAdmins.length)} />}
               </div>
             </div>
-
-            <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-lg shadow-slate-200/60">
-              <p className="text-sm uppercase tracking-[0.22em] text-slate-500">Permissões</p>
-              <div className="mt-4 space-y-4 text-sm leading-6 text-slate-700">
-                <p>Usuário operacional: cria compras, contas, manutenções e realiza baixa de estoque.</p>
-                <p>Proprietário: além do fluxo operacional, gerencia usuários e exclusões críticas.</p>
-                <p>Super admin da plataforma: gerencia tenants e pode excluir usuários e empresas inteiras.</p>
-              </div>
-            </div>
           </aside>
         </section>
       </div>
