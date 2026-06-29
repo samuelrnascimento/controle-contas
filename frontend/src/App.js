@@ -825,12 +825,7 @@ const FinanceApp = () => {
           <div className="grid gap-8 px-8 py-8 lg:grid-cols-[1.2fr_0.8fr] lg:px-10">
             <div>
               <p className="text-sm uppercase tracking-[0.28em] text-emerald-300">Finansam</p>
-              <h1 className="mt-3 text-4xl font-black tracking-tight">Operação diária e governança do proprietário em um único painel.</h1>
-              <p className="mt-4 max-w-2xl text-base leading-7 text-slate-300">
-                {isPlatformAdmin
-                  ? `Sessão global autenticada para ${user.name}. Este painel governa tenants e usuários da plataforma inteira.`
-                  : `Sessão autenticada para ${user.name}. Usuários comuns podem operar registros e estoque. O proprietário controla acessos, estado das contas e credenciais operacionais.`}
-              </p>
+              <h1 className="mt-3 text-4xl font-black tracking-tight">Plataforma Adminsitrativa</h1>
             </div>
             <div className="grid gap-4 rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur">
               <div>
