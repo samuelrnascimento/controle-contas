@@ -29,7 +29,8 @@ const runtimeCapabilities = {
   hasComprasTenantId: false,
   hasContasTenantId: false,
   hasManutencoesTenantId: false,
-  hasEstoqueTenantId: false
+  hasEstoqueTenantId: false,
+  hasInvestimentosTenantId: false
 };
 
 const allowedTenantPlans = ['Starter', 'Smart', 'Premium'];
@@ -248,6 +249,16 @@ const ensureSchema = async () => {
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
+    CREATE TABLE IF NOT EXISTS investimentos (
+      id SERIAL PRIMARY KEY,
+      descricao TEXT NOT NULL,
+      valor DECIMAL(10, 2) NOT NULL,
+      mes VARCHAR(7) NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    ALTER TABLE investimentos ADD COLUMN IF NOT EXISTS tenant_id INTEGER;
+
     CREATE TABLE IF NOT EXISTS estoque (
       id SERIAL PRIMARY KEY,
       item VARCHAR(255) NOT NULL UNIQUE,
@@ -258,6 +269,7 @@ const ensureSchema = async () => {
     CREATE INDEX IF NOT EXISTS idx_compras_mes ON compras(mes);
     CREATE INDEX IF NOT EXISTS idx_contas_mes ON contas(mes);
     CREATE INDEX IF NOT EXISTS idx_manutencoes_data ON manutencoes(data);
+    CREATE INDEX IF NOT EXISTS idx_investimentos_mes ON investimentos(mes);
     CREATE INDEX IF NOT EXISTS idx_estoque_item ON estoque(item);
 
     CREATE TABLE IF NOT EXISTS platform_users (
@@ -326,10 +338,20 @@ const discoverCapabilities = async () => {
     ) AS has_estoque_tenant_id`
   );
 
+  const investimentosTenantResult = await pool.query(
+    `SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'investimentos' AND column_name = 'tenant_id'
+    ) AS has_investimentos_tenant_id`
+  );
+
   runtimeCapabilities.hasComprasTenantId = comprasTenantResult.rows[0]?.has_compras_tenant_id === true;
   runtimeCapabilities.hasContasTenantId = contasTenantResult.rows[0]?.has_contas_tenant_id === true;
   runtimeCapabilities.hasManutencoesTenantId = manutencoesTenantResult.rows[0]?.has_manutencoes_tenant_id === true;
   runtimeCapabilities.hasEstoqueTenantId = estoqueTenantResult.rows[0]?.has_estoque_tenant_id === true;
+  runtimeCapabilities.hasInvestimentosTenantId = runtimeCapabilities.hasUsersTenantId
+    && investimentosTenantResult.rows[0]?.has_investimentos_tenant_id === true;
 };
 
 const hasPasswordChanged = async (plainPassword, passwordHash) => {
@@ -854,6 +876,57 @@ app.delete('/api/manutencoes/:id', authenticateToken, requireTenantScope, requir
     }
 
     res.json({ message: 'Manutenção excluída com sucesso' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/investimentos', authenticateToken, requireTenantScope, async (req, res) => {
+  try {
+    const result = runtimeCapabilities.hasInvestimentosTenantId
+      ? await pool.query('SELECT * FROM investimentos WHERE tenant_id = $1 ORDER BY mes DESC, id DESC', [req.user.tenant_id])
+      : await pool.query('SELECT * FROM investimentos ORDER BY mes DESC, id DESC');
+
+    res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/investimentos', authenticateToken, requireTenantScope, async (req, res) => {
+  const { descricao, valor, mes } = req.body;
+  const valorNumerico = parseAmount(valor);
+
+  if (!descricao || !mes || valorNumerico === null) {
+    return res.status(400).json({ error: 'Dados de investimento inválidos' });
+  }
+
+  try {
+    const result = runtimeCapabilities.hasInvestimentosTenantId
+      ? await pool.query(
+        'INSERT INTO investimentos (tenant_id, descricao, valor, mes) VALUES ($1, $2, $3, $4) RETURNING *',
+        [req.user.tenant_id, descricao, valorNumerico, mes]
+      )
+      : await pool.query(
+        'INSERT INTO investimentos (descricao, valor, mes) VALUES ($1, $2, $3) RETURNING *',
+        [descricao, valorNumerico, mes]
+      );
+
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/investimentos/:id', authenticateToken, requireTenantScope, requireRole('admin'), async (req, res) => {
+  try {
+    if (runtimeCapabilities.hasInvestimentosTenantId) {
+      await pool.query('DELETE FROM investimentos WHERE id::text = $1 AND tenant_id = $2', [req.params.id, req.user.tenant_id]);
+    } else {
+      await pool.query('DELETE FROM investimentos WHERE id::text = $1', [req.params.id]);
+    }
+
+    res.json({ message: 'Investimento excluído com sucesso' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

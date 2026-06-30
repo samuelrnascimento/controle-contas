@@ -5,6 +5,7 @@ import {
   Building2,
   CheckCircle2,
   DollarSign,
+  Landmark,
   LogIn,
   LogOut,
   Package,
@@ -35,6 +36,7 @@ const defaultDate = new Date().toISOString().slice(0, 10);
 const emptyCompra = () => ({ item: '', quantidade: '', valor: '', mes: defaultMonth });
 const emptyConta = () => ({ tipo: 'Água', valor: '', mes: defaultMonth });
 const emptyManutencao = () => ({ descricao: '', valor: '', data: defaultDate });
+const emptyInvestimento = () => ({ descricao: '', valor: '', mes: defaultMonth });
 const emptyNovoUsuario = () => ({ name: '', email: '', password: '' });
 const emptyCreateTenantForm = () => ({
   firstName: '',
@@ -146,7 +148,8 @@ const readMonthlyViewPreferences = () => {
         reportMonth: defaultMonth,
         comprasMonth: defaultMonth,
         contasMonth: defaultMonth,
-        manutencoesMonth: defaultMonth
+        manutencoesMonth: defaultMonth,
+        investimentosMonth: defaultMonth
       };
     }
 
@@ -156,14 +159,16 @@ const readMonthlyViewPreferences = () => {
       reportMonth: isMonthValueValid(parsed?.reportMonth) ? parsed.reportMonth : defaultMonth,
       comprasMonth: isMonthValueValid(parsed?.comprasMonth) ? parsed.comprasMonth : defaultMonth,
       contasMonth: isMonthValueValid(parsed?.contasMonth) ? parsed.contasMonth : defaultMonth,
-      manutencoesMonth: isMonthValueValid(parsed?.manutencoesMonth) ? parsed.manutencoesMonth : defaultMonth
+      manutencoesMonth: isMonthValueValid(parsed?.manutencoesMonth) ? parsed.manutencoesMonth : defaultMonth,
+      investimentosMonth: isMonthValueValid(parsed?.investimentosMonth) ? parsed.investimentosMonth : defaultMonth
     };
   } catch (_error) {
     return {
       reportMonth: defaultMonth,
       comprasMonth: defaultMonth,
       contasMonth: defaultMonth,
-      manutencoesMonth: defaultMonth
+      manutencoesMonth: defaultMonth,
+      investimentosMonth: defaultMonth
     };
   }
 };
@@ -176,6 +181,7 @@ const currencyFormatter = new Intl.NumberFormat('pt-BR', {
 const tabs = [
   { key: 'compras', label: 'Compras do Mês', icon: ShoppingCart },
   { key: 'contas', label: 'Contas Fixas', icon: DollarSign },
+  { key: 'investimentos', label: 'Investimentos', icon: Landmark },
   { key: 'manutencoes', label: 'Extraordinárias', icon: Wrench },
   { key: 'estoque', label: 'Estoque', icon: Package },
   { key: 'relatorios', label: 'Relatórios', icon: BarChart3 }
@@ -283,6 +289,7 @@ const FinanceApp = () => {
   const [activeTab, setActiveTab] = useState('compras');
   const [compras, setCompras] = useState([]);
   const [contas, setContas] = useState([]);
+  const [investimentos, setInvestimentos] = useState([]);
   const [manutencoes, setManutencoes] = useState([]);
   const [estoque, setEstoque] = useState([]);
   const [usuarios, setUsuarios] = useState([]);
@@ -296,6 +303,7 @@ const FinanceApp = () => {
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   const [novaCompra, setNovaCompra] = useState(emptyCompra());
   const [novaConta, setNovaConta] = useState(emptyConta());
+  const [novoInvestimento, setNovoInvestimento] = useState(emptyInvestimento());
   const [novaManutencao, setNovaManutencao] = useState(emptyManutencao());
   const [novoUsuario, setNovoUsuario] = useState(emptyNovoUsuario());
   const [showCreateTenantForm, setShowCreateTenantForm] = useState(false);
@@ -311,6 +319,7 @@ const FinanceApp = () => {
   const [mesFiltroCompras, setMesFiltroCompras] = useState(monthlyViewPreferences.comprasMonth);
   const [mesFiltroContas, setMesFiltroContas] = useState(monthlyViewPreferences.contasMonth);
   const [mesFiltroManutencoes, setMesFiltroManutencoes] = useState(monthlyViewPreferences.manutencoesMonth);
+  const [mesFiltroInvestimentos, setMesFiltroInvestimentos] = useState(monthlyViewPreferences.investimentosMonth);
   const [baixasEstoque, setBaixasEstoque] = useState({});
 
   const isPlatformAdmin = user?.scope === 'platform' || user?.role === 'super_admin';
@@ -370,6 +379,7 @@ const FinanceApp = () => {
       setPlatformAdmins(adminsData);
       setCompras([]);
       setContas([]);
+      setInvestimentos([]);
       setManutencoes([]);
       setEstoque([]);
       setUsuarios([]);
@@ -380,6 +390,7 @@ const FinanceApp = () => {
     const requests = [
       apiFetch('/compras', { authToken }),
       apiFetch('/contas', { authToken }),
+      apiFetch('/investimentos', { authToken }),
       apiFetch('/manutencoes', { authToken }),
       apiFetch('/estoque', { authToken })
     ];
@@ -388,10 +399,11 @@ const FinanceApp = () => {
       requests.push(apiFetch('/users', { authToken }));
     }
 
-    const [comprasData, contasData, manutencoesData, estoqueData, usersData] = await Promise.all(requests);
+    const [comprasData, contasData, investimentosData, manutencoesData, estoqueData, usersData] = await Promise.all(requests);
 
     setCompras(comprasData);
     setContas(contasData);
+    setInvestimentos(investimentosData);
     setManutencoes(manutencoesData);
     setEstoque(estoqueData);
 
@@ -447,10 +459,11 @@ const FinanceApp = () => {
         reportMonth: mesRelatorio,
         comprasMonth: mesFiltroCompras,
         contasMonth: mesFiltroContas,
-        manutencoesMonth: mesFiltroManutencoes
+        manutencoesMonth: mesFiltroManutencoes,
+        investimentosMonth: mesFiltroInvestimentos
       })
     );
-  }, [mesRelatorio, mesFiltroCompras, mesFiltroContas, mesFiltroManutencoes]);
+  }, [mesRelatorio, mesFiltroCompras, mesFiltroContas, mesFiltroManutencoes, mesFiltroInvestimentos]);
 
   const handleLogout = () => {
     localStorage.removeItem(TOKEN_STORAGE_KEY);
@@ -458,6 +471,7 @@ const FinanceApp = () => {
     setUser(null);
     setCompras([]);
     setContas([]);
+    setInvestimentos([]);
     setManutencoes([]);
     setEstoque([]);
     setUsuarios([]);
@@ -550,6 +564,21 @@ const FinanceApp = () => {
       });
       setNovaManutencao(emptyManutencao());
     }, 'Manutenção adicionada com sucesso');
+  };
+
+  const adicionarInvestimento = async () => {
+    if (!novoInvestimento.descricao || !novoInvestimento.valor || !novoInvestimento.mes) {
+      setErrorMessage('Preencha todos os campos do investimento');
+      return;
+    }
+
+    await runMutation(async () => {
+      await apiFetch('/investimentos', {
+        method: 'POST',
+        body: JSON.stringify(novoInvestimento)
+      });
+      setNovoInvestimento(emptyInvestimento());
+    }, 'Investimento adicionado com sucesso');
   };
 
   const darBaixaEstoque = async (id) => {
@@ -785,12 +814,14 @@ const FinanceApp = () => {
   const relatorio = useMemo(() => {
     const comprasMes = compras.filter((compra) => compra.mes === mesRelatorio);
     const contasMes = contas.filter((conta) => conta.mes === mesRelatorio);
+    const investimentosMes = investimentos.filter((investimento) => investimento.mes === mesRelatorio);
     const manutencoesMes = manutencoes.filter((manutencao) => manutencao.data.slice(0, 7) === mesRelatorio);
 
     const totalCompras = comprasMes.reduce((acc, compra) => acc + Number(compra.valor), 0);
     const totalContas = contasMes.reduce((acc, conta) => acc + Number(conta.valor), 0);
+    const totalInvestimentos = investimentosMes.reduce((acc, investimento) => acc + Number(investimento.valor), 0);
     const totalManutencoes = manutencoesMes.reduce((acc, manutencao) => acc + Number(manutencao.valor), 0);
-    const totalGeral = totalCompras + totalContas + totalManutencoes;
+    const totalGeral = totalCompras + totalContas + totalInvestimentos + totalManutencoes;
 
     const contasPorTipo = contasMes.reduce((acc, conta) => {
       acc[conta.tipo] = (acc[conta.tipo] || 0) + Number(conta.valor);
@@ -800,14 +831,16 @@ const FinanceApp = () => {
     return {
       comprasMes,
       contasMes,
+      investimentosMes,
       manutencoesMes,
       contasPorTipo,
       totalCompras,
       totalContas,
+      totalInvestimentos,
       totalManutencoes,
       totalGeral
     };
-  }, [compras, contas, manutencoes, mesRelatorio]);
+  }, [compras, contas, investimentos, manutencoes, mesRelatorio]);
 
   const tenantPlanOptions = useMemo(() => {
     const options = Array.from(new Set(
@@ -895,6 +928,7 @@ const FinanceApp = () => {
   const distributionItems = [
     { label: 'Compras', total: relatorio.totalCompras, className: 'bg-blue-500' },
     { label: 'Contas', total: relatorio.totalContas, className: 'bg-emerald-500' },
+    { label: 'Investimentos', total: relatorio.totalInvestimentos, className: 'bg-indigo-500' },
     { label: 'Manutenções', total: relatorio.totalManutencoes, className: 'bg-amber-500' }
   ];
 
@@ -1155,6 +1189,33 @@ const FinanceApp = () => {
               </div>
             )}
 
+            {activeTab === 'investimentos' && (
+              <div>
+                <SectionHeader title="Investimentos" description="Aportes mensais de investimentos e reservas." />
+                <div className="mt-6 grid gap-4 md:grid-cols-4">
+                  <Field value={novoInvestimento.descricao} onChange={(value) => setNovoInvestimento((current) => ({ ...current, descricao: value }))} placeholder="Descrição" />
+                  <Field type="number" value={novoInvestimento.valor} onChange={(value) => setNovoInvestimento((current) => ({ ...current, valor: value }))} placeholder="Valor" />
+                  <Field type="month" value={novoInvestimento.mes} onChange={(value) => setNovoInvestimento((current) => ({ ...current, mes: value }))} />
+                  <PrimaryButton icon={PlusCircle} onClick={adicionarInvestimento} disabled={loading} label="Adicionar" />
+                </div>
+                <FilterMonth value={mesFiltroInvestimentos} onChange={setMesFiltroInvestimentos} />
+                <DataTable
+                  headers={['Descrição', 'Valor', 'Mês', 'Ações']}
+                  rows={investimentos.filter((investimento) => investimento.mes === mesFiltroInvestimentos).map((investimento) => [
+                    investimento.descricao,
+                    formatCurrency(investimento.valor),
+                    investimento.mes,
+                    isAdmin ? (
+                      <DangerTextButton key={`delete-investimento-${investimento.id}`} onClick={() => excluirRegistro(`/investimentos/${investimento.id}`, 'Investimento excluído com sucesso')} label="Excluir" />
+                    ) : (
+                      <span key={`readonly-investimento-${investimento.id}`} className="text-sm text-slate-400">Somente admin exclui</span>
+                    )
+                  ])}
+                  emptyMessage="Nenhum investimento registrado para este mês"
+                />
+              </div>
+            )}
+
             {activeTab === 'estoque' && (
               <div>
                 <SectionHeader title="Controle de Estoque" description="Qualquer usuário ativo pode registrar baixa, respeitando saldo disponível." />
@@ -1194,6 +1255,7 @@ const FinanceApp = () => {
                 <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                   <MetricCard title="Compras" value={formatCurrency(relatorio.totalCompras)} tone="bg-blue-100 text-blue-900" />
                   <MetricCard title="Contas" value={formatCurrency(relatorio.totalContas)} tone="bg-emerald-100 text-emerald-900" />
+                  <MetricCard title="Investimentos" value={formatCurrency(relatorio.totalInvestimentos)} tone="bg-indigo-100 text-indigo-900" />
                   <MetricCard title="Manutenções" value={formatCurrency(relatorio.totalManutencoes)} tone="bg-amber-100 text-amber-900" />
                   <MetricCard title="Total Geral" value={formatCurrency(relatorio.totalGeral)} tone="bg-rose-100 text-rose-900" />
                 </div>
@@ -1752,10 +1814,11 @@ const FinanceApp = () => {
             <div className="rounded-[28px] bg-slate-950 p-6 text-white shadow-xl shadow-slate-300/40">
               <p className="text-sm uppercase tracking-[0.22em] text-emerald-300">Resumo</p>
               <div className="mt-4 space-y-4">
-                <SummaryRow label="Compras cadastradas" value={String(compras.length)} />
-                <SummaryRow label="Contas cadastradas" value={String(contas.length)} />
-                <SummaryRow label="Manutenções" value={String(manutencoes.length)} />
-                <SummaryRow label="Itens em estoque" value={String(estoque.length)} />
+                {!isPlatformAdmin && <SummaryRow label="Compras cadastradas" value={String(compras.length)} />}
+                {!isPlatformAdmin && <SummaryRow label="Contas cadastradas" value={String(contas.length)} />}
+                {!isPlatformAdmin && <SummaryRow label="Investimentos" value={String(investimentos.length)} />}
+                {!isPlatformAdmin && <SummaryRow label="Manutenções" value={String(manutencoes.length)} />}
+                {!isPlatformAdmin && <SummaryRow label="Itens em estoque" value={String(estoque.length)} />}
                 {isAdmin && <SummaryRow label="Usuários ativos" value={String(usuarios.filter((registeredUser) => registeredUser.active).length)} />}
                 {isPlatformAdmin && <SummaryRow label="Tenants" value={String(platformTenants.length)} />}
                 {isPlatformAdmin && <SummaryRow label="Usuários globais" value={String(platformUsers.length)} />}
