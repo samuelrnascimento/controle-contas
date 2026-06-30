@@ -23,6 +23,7 @@ const API_BASE = '/api';
 const TOKEN_STORAGE_KEY = 'finansam-auth-token';
 const TENANT_VIEW_STORAGE_KEY = 'finansam-platform-tenant-view';
 const MONTHLY_VIEW_STORAGE_KEY = 'finansam-monthly-view';
+const TENANT_PLANS = ['Starter', 'Smart', 'Premium'];
 
 const defaultMonth = new Date().toISOString().slice(0, 7);
 const defaultDate = new Date().toISOString().slice(0, 10);
@@ -31,12 +32,19 @@ const emptyCompra = () => ({ item: '', quantidade: '', valor: '', mes: defaultMo
 const emptyConta = () => ({ tipo: 'Água', valor: '', mes: defaultMonth });
 const emptyManutencao = () => ({ descricao: '', valor: '', data: defaultDate });
 const emptyNovoUsuario = () => ({ name: '', email: '', password: '' });
-const emptyTenantForm = () => ({ name: '', slug: '', plan: 'starter', subscriptionStatus: 'active' });
 const emptyCreateTenantForm = () => ({
   firstName: '',
   lastName: '',
   company: '',
-  plan: 'starter',
+  plan: 'Starter',
+  phone: '',
+  email: ''
+});
+const emptyEditTenantForm = () => ({
+  firstName: '',
+  lastName: '',
+  company: '',
+  plan: 'Starter',
   phone: '',
   email: ''
 });
@@ -48,6 +56,24 @@ const normalizeTenantSlug = (value) => String(value || '')
   .replace(/[^a-z0-9-]+/g, '-')
   .replace(/-{2,}/g, '-')
   .replace(/^-+|-+$/g, '');
+
+const normalizeTenantPlan = (value) => {
+  const normalized = String(value || '').trim().toLowerCase();
+
+  if (normalized === 'starter') {
+    return 'Starter';
+  }
+
+  if (normalized === 'smart') {
+    return 'Smart';
+  }
+
+  if (normalized === 'premium') {
+    return 'Premium';
+  }
+
+  return null;
+};
 
 const readTenantViewPreferences = () => {
   try {
@@ -66,9 +92,11 @@ const readTenantViewPreferences = () => {
     const allowedKeys = ['name', 'plan', 'subscription_status'];
     const nextKey = allowedKeys.includes(parsed?.sortConfig?.key) ? parsed.sortConfig.key : 'name';
     const nextDirection = parsed?.sortConfig?.direction === 'desc' ? 'desc' : 'asc';
+    const nextPlanFilter = typeof parsed?.planFilter === 'string' ? parsed.planFilter : 'all';
+    const isPlanFilterValid = nextPlanFilter === 'all' || TENANT_PLANS.includes(nextPlanFilter);
 
     return {
-      planFilter: typeof parsed?.planFilter === 'string' ? parsed.planFilter : 'all',
+      planFilter: isPlanFilterValid ? nextPlanFilter : 'all',
       statusFilter: typeof parsed?.statusFilter === 'string' ? parsed.statusFilter : 'all',
       searchTerm: typeof parsed?.searchTerm === 'string' ? parsed.searchTerm : '',
       sortConfig: { key: nextKey, direction: nextDirection }
@@ -246,7 +274,7 @@ const FinanceApp = () => {
   const [novoUsuario, setNovoUsuario] = useState(emptyNovoUsuario());
   const [showCreateTenantForm, setShowCreateTenantForm] = useState(false);
   const [createTenantForm, setCreateTenantForm] = useState(emptyCreateTenantForm());
-  const [tenantForm, setTenantForm] = useState(emptyTenantForm());
+  const [editTenantForm, setEditTenantForm] = useState(emptyEditTenantForm());
   const [editingTenantId, setEditingTenantId] = useState(null);
   const [tenantPlanFilter, setTenantPlanFilter] = useState(tenantViewPreferences.planFilter);
   const [tenantStatusFilter, setTenantStatusFilter] = useState(tenantViewPreferences.statusFilter);
@@ -569,60 +597,74 @@ const FinanceApp = () => {
 
   const iniciarEdicaoTenant = (tenant) => {
     setEditingTenantId(String(tenant.id));
-    setTenantForm({
-      name: tenant.name || '',
-      slug: tenant.slug || '',
-      plan: tenant.plan || 'starter',
-      subscriptionStatus: tenant.subscription_status || 'active'
+    setEditTenantForm({
+      firstName: tenant.name || '',
+      lastName: '',
+      company: tenant.name || '',
+      plan: normalizeTenantPlan(tenant.plan) || 'Starter',
+      phone: '',
+      email: ''
     });
     clearMessages();
   };
 
   const cancelarEdicaoTenant = () => {
     setEditingTenantId(null);
-    setTenantForm(emptyTenantForm());
+    setEditTenantForm(emptyEditTenantForm());
     clearMessages();
   };
 
   const salvarTenant = async () => {
+    if (!editingTenantId) {
+      return;
+    }
+
+    const firstName = editTenantForm.firstName.trim();
+    const lastName = editTenantForm.lastName.trim();
+    const company = editTenantForm.company.trim();
+    const plan = normalizeTenantPlan(editTenantForm.plan);
+    const phone = editTenantForm.phone.trim();
+    const email = editTenantForm.email.trim();
+
+    if (!firstName || !plan || !phone || !email) {
+      setErrorMessage('Preencha os campos obrigatórios: Nome, Plano, Telefone e Email');
+      return;
+    }
+
+    const ownerName = `${firstName} ${lastName}`.trim();
+    const tenantName = company || ownerName;
+    const tenantSlug = normalizeTenantSlug(company || ownerName || email.split('@')[0]);
+
+    if (!tenantName || !tenantSlug) {
+      setErrorMessage('Não foi possível gerar os dados do tenant. Revise os campos informados.');
+      return;
+    }
+
     const payload = {
-      name: tenantForm.name.trim(),
-      slug: tenantForm.slug.trim(),
-      plan: tenantForm.plan.trim(),
-      subscriptionStatus: tenantForm.subscriptionStatus.trim()
+      name: tenantName,
+      slug: tenantSlug,
+      plan,
+      subscriptionStatus: 'active',
+      ownerName,
+      contactPhone: phone,
+      contactEmail: email
     };
 
-    if (!payload.name || !payload.slug) {
-      setErrorMessage('Nome e slug do tenant são obrigatórios');
-      return;
-    }
-
-    if (editingTenantId) {
-      await runMutation(async () => {
-        await apiFetch(`/platform/tenants/${editingTenantId}`, {
-          method: 'PATCH',
-          body: JSON.stringify(payload)
-        });
-        setEditingTenantId(null);
-        setTenantForm(emptyTenantForm());
-      }, 'Tenant atualizado com sucesso');
-      return;
-    }
-
     await runMutation(async () => {
-      await apiFetch('/platform/tenants', {
-        method: 'POST',
+      await apiFetch(`/platform/tenants/${editingTenantId}`, {
+        method: 'PATCH',
         body: JSON.stringify(payload)
       });
-      setTenantForm(emptyTenantForm());
-    }, 'Tenant criado com sucesso');
+      setEditingTenantId(null);
+      setEditTenantForm(emptyEditTenantForm());
+    }, 'Tenant atualizado com sucesso');
   };
 
   const criarTenantComFormulario = async () => {
     const firstName = createTenantForm.firstName.trim();
     const lastName = createTenantForm.lastName.trim();
     const company = createTenantForm.company.trim();
-    const plan = createTenantForm.plan.trim();
+    const plan = normalizeTenantPlan(createTenantForm.plan);
     const phone = createTenantForm.phone.trim();
     const email = createTenantForm.email.trim();
 
@@ -1267,7 +1309,15 @@ const FinanceApp = () => {
                         <Field value={createTenantForm.firstName} onChange={(value) => setCreateTenantForm((current) => ({ ...current, firstName: value }))} placeholder="Nome *" />
                         <Field value={createTenantForm.lastName} onChange={(value) => setCreateTenantForm((current) => ({ ...current, lastName: value }))} placeholder="Sobrenome" />
                         <Field value={createTenantForm.company} onChange={(value) => setCreateTenantForm((current) => ({ ...current, company: value }))} placeholder="Empresa" />
-                        <Field value={createTenantForm.plan} onChange={(value) => setCreateTenantForm((current) => ({ ...current, plan: value }))} placeholder="Plano *" />
+                        <select
+                          value={createTenantForm.plan}
+                          onChange={(event) => setCreateTenantForm((current) => ({ ...current, plan: event.target.value }))}
+                          className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                        >
+                          {TENANT_PLANS.map((planOption) => (
+                            <option key={planOption} value={planOption}>{planOption}</option>
+                          ))}
+                        </select>
                         <Field value={createTenantForm.phone} onChange={(value) => setCreateTenantForm((current) => ({ ...current, phone: value }))} placeholder="Telefone *" />
                         <Field type="email" value={createTenantForm.email} onChange={(value) => setCreateTenantForm((current) => ({ ...current, email: value }))} placeholder="Email *" />
                       </div>
@@ -1297,11 +1347,22 @@ const FinanceApp = () => {
                       </button>
                     </div>
                     <div className="mt-4 grid gap-3 md:grid-cols-4">
-                      <Field value={tenantForm.name} onChange={(value) => setTenantForm((current) => ({ ...current, name: value }))} placeholder="Nome do tenant" />
-                      <Field value={tenantForm.slug} onChange={(value) => setTenantForm((current) => ({ ...current, slug: value }))} placeholder="slug-do-tenant" />
-                      <Field value={tenantForm.plan} onChange={(value) => setTenantForm((current) => ({ ...current, plan: value }))} placeholder="Plano" />
-                      <Field value={tenantForm.subscriptionStatus} onChange={(value) => setTenantForm((current) => ({ ...current, subscriptionStatus: value }))} placeholder="Status" />
+                      <Field value={editTenantForm.firstName} onChange={(value) => setEditTenantForm((current) => ({ ...current, firstName: value }))} placeholder="Nome *" />
+                      <Field value={editTenantForm.lastName} onChange={(value) => setEditTenantForm((current) => ({ ...current, lastName: value }))} placeholder="Sobrenome" />
+                      <Field value={editTenantForm.company} onChange={(value) => setEditTenantForm((current) => ({ ...current, company: value }))} placeholder="Empresa" />
+                      <select
+                        value={editTenantForm.plan}
+                        onChange={(event) => setEditTenantForm((current) => ({ ...current, plan: event.target.value }))}
+                        className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                      >
+                        {TENANT_PLANS.map((planOption) => (
+                          <option key={planOption} value={planOption}>{planOption}</option>
+                        ))}
+                      </select>
+                      <Field value={editTenantForm.phone} onChange={(value) => setEditTenantForm((current) => ({ ...current, phone: value }))} placeholder="Telefone *" />
+                      <Field type="email" value={editTenantForm.email} onChange={(value) => setEditTenantForm((current) => ({ ...current, email: value }))} placeholder="Email *" />
                     </div>
+                    <p className="mt-3 text-xs text-slate-500">Campos com * são obrigatórios. Sobrenome e Empresa são opcionais.</p>
                     <div className="mt-4">
                       <PrimaryButton
                         icon={PlusCircle}

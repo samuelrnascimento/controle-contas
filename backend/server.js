@@ -32,6 +32,26 @@ const runtimeCapabilities = {
   hasEstoqueTenantId: false
 };
 
+const allowedTenantPlans = ['Starter', 'Smart', 'Premium'];
+
+const normalizeTenantPlan = (value) => {
+  const normalized = String(value || '').trim().toLowerCase();
+
+  if (normalized === 'starter') {
+    return 'Starter';
+  }
+
+  if (normalized === 'smart') {
+    return 'Smart';
+  }
+
+  if (normalized === 'premium') {
+    return 'Premium';
+  }
+
+  return null;
+};
+
 const normalizeRole = (role) => (role === 'owner' ? 'admin' : role);
 const isUserActive = (user) => user.active === undefined || user.active === null || user.active === true;
 
@@ -294,7 +314,7 @@ const ensureAdminUser = async () => {
 
     const tenantResult = await pool.query(
       `INSERT INTO tenants (name, slug, plan, subscription_status)
-       VALUES ($1, $2, 'starter', 'active')
+       VALUES ($1, $2, 'Starter', 'active')
        ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name
        RETURNING id`,
       [adminTenantName, adminTenantSlug]
@@ -895,7 +915,7 @@ app.post('/api/platform/tenants', authenticateToken, requirePlatformAdmin, async
 
   const name = String(req.body?.name || '').trim();
   const slug = normalizeTenantSlug(req.body?.slug);
-  const plan = String(req.body?.plan || 'starter').trim() || 'starter';
+  const plan = normalizeTenantPlan(req.body?.plan || 'Starter');
   const subscriptionStatus = String(req.body?.subscriptionStatus || 'active').trim() || 'active';
 
   if (!name) {
@@ -908,6 +928,10 @@ app.post('/api/platform/tenants', authenticateToken, requirePlatformAdmin, async
 
   if (!/^[a-z0-9-]{3,80}$/.test(slug)) {
     return res.status(400).json({ error: 'Slug inválido. Use de 3 a 80 caracteres com letras minúsculas, números e hífen.' });
+  }
+
+  if (!plan) {
+    return res.status(400).json({ error: `Plano inválido. Use apenas: ${allowedTenantPlans.join(', ')}` });
   }
 
   try {
@@ -941,7 +965,7 @@ app.patch('/api/platform/tenants/:id', authenticateToken, requirePlatformAdmin, 
 
   const nextName = req.body?.name !== undefined ? String(req.body.name).trim() : null;
   const nextSlug = req.body?.slug !== undefined ? normalizeTenantSlug(req.body.slug) : null;
-  const nextPlan = req.body?.plan !== undefined ? (String(req.body.plan).trim() || null) : null;
+  const nextPlan = req.body?.plan !== undefined ? normalizeTenantPlan(req.body.plan) : null;
   const nextStatus = req.body?.subscriptionStatus !== undefined ? (String(req.body.subscriptionStatus).trim() || null) : null;
 
   if (nextName !== null && !nextName) {
@@ -954,6 +978,10 @@ app.patch('/api/platform/tenants/:id', authenticateToken, requirePlatformAdmin, 
 
   if (nextSlug !== null && !/^[a-z0-9-]{3,80}$/.test(nextSlug)) {
     return res.status(400).json({ error: 'Slug inválido. Use de 3 a 80 caracteres com letras minúsculas, números e hífen.' });
+  }
+
+  if (req.body?.plan !== undefined && !nextPlan) {
+    return res.status(400).json({ error: `Plano inválido. Use apenas: ${allowedTenantPlans.join(', ')}` });
   }
 
   if (nextName === null && nextSlug === null && nextPlan === null && nextStatus === null) {
