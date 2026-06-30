@@ -176,7 +176,7 @@ const currencyFormatter = new Intl.NumberFormat('pt-BR', {
 const tabs = [
   { key: 'compras', label: 'Compras do Mês', icon: ShoppingCart },
   { key: 'contas', label: 'Contas Fixas', icon: DollarSign },
-  { key: 'manutencoes', label: 'Manutenções', icon: Wrench },
+  { key: 'manutencoes', label: 'Extraordinárias', icon: Wrench },
   { key: 'estoque', label: 'Estoque', icon: Package },
   { key: 'relatorios', label: 'Relatórios', icon: BarChart3 }
 ];
@@ -1130,7 +1130,7 @@ const FinanceApp = () => {
 
             {activeTab === 'manutencoes' && (
               <div>
-                <SectionHeader title="Manutenções" description="Custos ocasionais separados das contas fixas." />
+                <SectionHeader title="Extraordinárias" description="Custos ocasionais separados das contas fixas." />
                 <div className="mt-6 grid gap-4 md:grid-cols-4">
                   <Field value={novaManutencao.descricao} onChange={(value) => setNovaManutencao((current) => ({ ...current, descricao: value }))} placeholder="Descrição" />
                   <Field type="number" value={novaManutencao.valor} onChange={(value) => setNovaManutencao((current) => ({ ...current, valor: value }))} placeholder="Valor" />
