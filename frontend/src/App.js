@@ -32,8 +32,22 @@ const emptyConta = () => ({ tipo: 'Água', valor: '', mes: defaultMonth });
 const emptyManutencao = () => ({ descricao: '', valor: '', data: defaultDate });
 const emptyNovoUsuario = () => ({ name: '', email: '', password: '' });
 const emptyTenantForm = () => ({ name: '', slug: '', plan: 'starter', subscriptionStatus: 'active' });
+const emptyCreateTenantForm = () => ({
+  firstName: '',
+  lastName: '',
+  company: '',
+  plan: 'starter',
+  phone: '',
+  email: ''
+});
 const defaultTenantSort = () => ({ key: 'name', direction: 'asc' });
 const isMonthValueValid = (value) => /^\d{4}-\d{2}$/.test(String(value || ''));
+const normalizeTenantSlug = (value) => String(value || '')
+  .trim()
+  .toLowerCase()
+  .replace(/[^a-z0-9-]+/g, '-')
+  .replace(/-{2,}/g, '-')
+  .replace(/^-+|-+$/g, '');
 
 const readTenantViewPreferences = () => {
   try {
@@ -230,6 +244,8 @@ const FinanceApp = () => {
   const [novaConta, setNovaConta] = useState(emptyConta());
   const [novaManutencao, setNovaManutencao] = useState(emptyManutencao());
   const [novoUsuario, setNovoUsuario] = useState(emptyNovoUsuario());
+  const [showCreateTenantForm, setShowCreateTenantForm] = useState(false);
+  const [createTenantForm, setCreateTenantForm] = useState(emptyCreateTenantForm());
   const [tenantForm, setTenantForm] = useState(emptyTenantForm());
   const [editingTenantId, setEditingTenantId] = useState(null);
   const [tenantPlanFilter, setTenantPlanFilter] = useState(tenantViewPreferences.planFilter);
@@ -599,6 +615,47 @@ const FinanceApp = () => {
         body: JSON.stringify(payload)
       });
       setTenantForm(emptyTenantForm());
+    }, 'Tenant criado com sucesso');
+  };
+
+  const criarTenantComFormulario = async () => {
+    const firstName = createTenantForm.firstName.trim();
+    const lastName = createTenantForm.lastName.trim();
+    const company = createTenantForm.company.trim();
+    const plan = createTenantForm.plan.trim();
+    const phone = createTenantForm.phone.trim();
+    const email = createTenantForm.email.trim();
+
+    if (!firstName || !plan || !phone || !email) {
+      setErrorMessage('Preencha os campos obrigatórios: Nome, Plano, Telefone e Email');
+      return;
+    }
+
+    const ownerName = `${firstName} ${lastName}`.trim();
+    const tenantName = company || ownerName;
+    const tenantSlug = normalizeTenantSlug(company || ownerName || email.split('@')[0]);
+
+    if (!tenantName || !tenantSlug) {
+      setErrorMessage('Não foi possível gerar os dados do tenant. Revise os campos informados.');
+      return;
+    }
+
+    await runMutation(async () => {
+      await apiFetch('/platform/tenants', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: tenantName,
+          slug: tenantSlug,
+          plan,
+          subscriptionStatus: 'active',
+          ownerName,
+          contactPhone: phone,
+          contactEmail: email
+        })
+      });
+
+      setCreateTenantForm(emptyCreateTenantForm());
+      setShowCreateTenantForm(false);
     }, 'Tenant criado com sucesso');
   };
 
@@ -1177,8 +1234,60 @@ const FinanceApp = () => {
 
                 <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-5">
                   <div className="flex flex-wrap items-center justify-between gap-3">
-                    <h3 className="text-lg font-bold">{editingTenantId ? 'Editar tenant' : 'Criar tenant'}</h3>
-                    {editingTenantId && (
+                    <h3 className="text-lg font-bold">Criar tenant</h3>
+                    {!showCreateTenantForm ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowCreateTenantForm(true);
+                          clearMessages();
+                        }}
+                        className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-3 py-2 font-semibold text-white transition hover:bg-slate-800"
+                      >
+                        <PlusCircle size={14} /> Novo tenant
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowCreateTenantForm(false);
+                          setCreateTenantForm(emptyCreateTenantForm());
+                          clearMessages();
+                        }}
+                        className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                      >
+                        Cancelar
+                      </button>
+                    )}
+                  </div>
+
+                  {showCreateTenantForm && (
+                    <>
+                      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                        <Field value={createTenantForm.firstName} onChange={(value) => setCreateTenantForm((current) => ({ ...current, firstName: value }))} placeholder="Nome *" />
+                        <Field value={createTenantForm.lastName} onChange={(value) => setCreateTenantForm((current) => ({ ...current, lastName: value }))} placeholder="Sobrenome" />
+                        <Field value={createTenantForm.company} onChange={(value) => setCreateTenantForm((current) => ({ ...current, company: value }))} placeholder="Empresa" />
+                        <Field value={createTenantForm.plan} onChange={(value) => setCreateTenantForm((current) => ({ ...current, plan: value }))} placeholder="Plano *" />
+                        <Field value={createTenantForm.phone} onChange={(value) => setCreateTenantForm((current) => ({ ...current, phone: value }))} placeholder="Telefone *" />
+                        <Field type="email" value={createTenantForm.email} onChange={(value) => setCreateTenantForm((current) => ({ ...current, email: value }))} placeholder="Email *" />
+                      </div>
+                      <p className="mt-3 text-xs text-slate-500">Campos com * são obrigatórios. Sobrenome e Empresa são opcionais.</p>
+                      <div className="mt-4">
+                        <PrimaryButton
+                          icon={PlusCircle}
+                          onClick={criarTenantComFormulario}
+                          disabled={loading}
+                          label="Criar tenant"
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {editingTenantId && (
+                  <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-5">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <h3 className="text-lg font-bold">Editar tenant</h3>
                       <button
                         type="button"
                         onClick={cancelarEdicaoTenant}
@@ -1186,23 +1295,23 @@ const FinanceApp = () => {
                       >
                         Cancelar edição
                       </button>
-                    )}
+                    </div>
+                    <div className="mt-4 grid gap-3 md:grid-cols-4">
+                      <Field value={tenantForm.name} onChange={(value) => setTenantForm((current) => ({ ...current, name: value }))} placeholder="Nome do tenant" />
+                      <Field value={tenantForm.slug} onChange={(value) => setTenantForm((current) => ({ ...current, slug: value }))} placeholder="slug-do-tenant" />
+                      <Field value={tenantForm.plan} onChange={(value) => setTenantForm((current) => ({ ...current, plan: value }))} placeholder="Plano" />
+                      <Field value={tenantForm.subscriptionStatus} onChange={(value) => setTenantForm((current) => ({ ...current, subscriptionStatus: value }))} placeholder="Status" />
+                    </div>
+                    <div className="mt-4">
+                      <PrimaryButton
+                        icon={PlusCircle}
+                        onClick={salvarTenant}
+                        disabled={loading}
+                        label="Salvar alterações"
+                      />
+                    </div>
                   </div>
-                  <div className="mt-4 grid gap-3 md:grid-cols-4">
-                    <Field value={tenantForm.name} onChange={(value) => setTenantForm((current) => ({ ...current, name: value }))} placeholder="Nome do tenant" />
-                    <Field value={tenantForm.slug} onChange={(value) => setTenantForm((current) => ({ ...current, slug: value }))} placeholder="slug-do-tenant" />
-                    <Field value={tenantForm.plan} onChange={(value) => setTenantForm((current) => ({ ...current, plan: value }))} placeholder="Plano" />
-                    <Field value={tenantForm.subscriptionStatus} onChange={(value) => setTenantForm((current) => ({ ...current, subscriptionStatus: value }))} placeholder="Status" />
-                  </div>
-                  <div className="mt-4">
-                    <PrimaryButton
-                      icon={PlusCircle}
-                      onClick={salvarTenant}
-                      disabled={loading}
-                      label={editingTenantId ? 'Salvar alterações' : 'Criar tenant'}
-                    />
-                  </div>
-                </div>
+                )}
 
                 <div className="mt-6 rounded-3xl border border-slate-200 bg-white shadow-sm">
                   <div className="border-b border-slate-200 px-5 py-4">
