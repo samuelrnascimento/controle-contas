@@ -33,6 +33,7 @@ const runtimeCapabilities = {
 };
 
 const allowedTenantPlans = ['Starter', 'Smart', 'Premium'];
+const allowedTenantStatuses = ['active', 'inactive'];
 
 const normalizeTenantPlan = (value) => {
   const normalized = String(value || '').trim().toLowerCase();
@@ -50,6 +51,40 @@ const normalizeTenantPlan = (value) => {
   }
 
   return null;
+};
+
+const normalizeTenantStatus = (value) => {
+  const normalized = String(value || '').trim().toLowerCase();
+
+  if (normalized === 'active' || normalized === 'ativo') {
+    return 'active';
+  }
+
+  if (normalized === 'inactive' || normalized === 'inativo') {
+    return 'inactive';
+  }
+
+  return null;
+};
+
+const applyTenantUserStatus = async (tenantId, status) => {
+  if (!runtimeCapabilities.hasUsersTenantId) {
+    return;
+  }
+
+  if (status === 'inactive') {
+    await pool.query('UPDATE users SET active = false WHERE tenant_id = $1', [tenantId]);
+    return;
+  }
+
+  if (status === 'active') {
+    await pool.query(
+      `UPDATE users
+       SET active = true
+       WHERE tenant_id = $1 AND role IN ('admin', 'owner')`,
+      [tenantId]
+    );
+  }
 };
 
 const normalizeRole = (role) => (role === 'owner' ? 'admin' : role);
@@ -916,7 +951,7 @@ app.post('/api/platform/tenants', authenticateToken, requirePlatformAdmin, async
   const name = String(req.body?.name || '').trim();
   const slug = normalizeTenantSlug(req.body?.slug);
   const plan = normalizeTenantPlan(req.body?.plan || 'Starter');
-  const subscriptionStatus = String(req.body?.subscriptionStatus || 'active').trim() || 'active';
+  const subscriptionStatus = normalizeTenantStatus(req.body?.subscriptionStatus || 'active');
 
   if (!name) {
     return res.status(400).json({ error: 'Nome do tenant é obrigatório' });
@@ -934,6 +969,10 @@ app.post('/api/platform/tenants', authenticateToken, requirePlatformAdmin, async
     return res.status(400).json({ error: `Plano inválido. Use apenas: ${allowedTenantPlans.join(', ')}` });
   }
 
+  if (!subscriptionStatus) {
+    return res.status(400).json({ error: `Status inválido. Use apenas: ${allowedTenantStatuses.join(', ')}` });
+  }
+
   try {
     const result = await pool.query(
       `INSERT INTO tenants (name, slug, plan, subscription_status)
@@ -941,6 +980,8 @@ app.post('/api/platform/tenants', authenticateToken, requirePlatformAdmin, async
        RETURNING id, name, slug, plan, subscription_status, created_at`,
       [name, slug, plan, subscriptionStatus]
     );
+
+    await applyTenantUserStatus(result.rows[0].id, subscriptionStatus);
 
     return res.status(201).json(result.rows[0]);
   } catch (error) {
@@ -966,7 +1007,7 @@ app.patch('/api/platform/tenants/:id', authenticateToken, requirePlatformAdmin, 
   const nextName = req.body?.name !== undefined ? String(req.body.name).trim() : null;
   const nextSlug = req.body?.slug !== undefined ? normalizeTenantSlug(req.body.slug) : null;
   const nextPlan = req.body?.plan !== undefined ? normalizeTenantPlan(req.body.plan) : null;
-  const nextStatus = req.body?.subscriptionStatus !== undefined ? (String(req.body.subscriptionStatus).trim() || null) : null;
+  const nextStatus = req.body?.subscriptionStatus !== undefined ? normalizeTenantStatus(req.body.subscriptionStatus) : null;
 
   if (nextName !== null && !nextName) {
     return res.status(400).json({ error: 'Nome do tenant não pode ficar vazio' });
@@ -982,6 +1023,10 @@ app.patch('/api/platform/tenants/:id', authenticateToken, requirePlatformAdmin, 
 
   if (req.body?.plan !== undefined && !nextPlan) {
     return res.status(400).json({ error: `Plano inválido. Use apenas: ${allowedTenantPlans.join(', ')}` });
+  }
+
+  if (req.body?.subscriptionStatus !== undefined && !nextStatus) {
+    return res.status(400).json({ error: `Status inválido. Use apenas: ${allowedTenantStatuses.join(', ')}` });
   }
 
   if (nextName === null && nextSlug === null && nextPlan === null && nextStatus === null) {
@@ -1014,6 +1059,8 @@ app.patch('/api/platform/tenants/:id', authenticateToken, requirePlatformAdmin, 
        RETURNING id, name, slug, plan, subscription_status, created_at`,
       [nextName, nextSlug, nextPlan, nextStatus, targetId]
     );
+
+    await applyTenantUserStatus(result.rows[0].id, result.rows[0].subscription_status);
 
     return res.json(result.rows[0]);
   } catch (error) {

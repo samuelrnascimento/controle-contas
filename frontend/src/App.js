@@ -24,6 +24,10 @@ const TOKEN_STORAGE_KEY = 'finansam-auth-token';
 const TENANT_VIEW_STORAGE_KEY = 'finansam-platform-tenant-view';
 const MONTHLY_VIEW_STORAGE_KEY = 'finansam-monthly-view';
 const TENANT_PLANS = ['Starter', 'Smart', 'Premium'];
+const TENANT_STATUSES = [
+  { value: 'active', label: 'Ativo' },
+  { value: 'inactive', label: 'Inativo' }
+];
 
 const defaultMonth = new Date().toISOString().slice(0, 7);
 const defaultDate = new Date().toISOString().slice(0, 10);
@@ -37,6 +41,7 @@ const emptyCreateTenantForm = () => ({
   lastName: '',
   company: '',
   plan: 'Starter',
+  status: 'active',
   phone: '',
   email: ''
 });
@@ -45,6 +50,7 @@ const emptyEditTenantForm = () => ({
   lastName: '',
   company: '',
   plan: 'Starter',
+  status: 'active',
   phone: '',
   email: ''
 });
@@ -70,6 +76,20 @@ const normalizeTenantPlan = (value) => {
 
   if (normalized === 'premium') {
     return 'Premium';
+  }
+
+  return null;
+};
+
+const normalizeTenantStatus = (value) => {
+  const normalized = String(value || '').trim().toLowerCase();
+
+  if (normalized === 'active' || normalized === 'ativo') {
+    return 'active';
+  }
+
+  if (normalized === 'inactive' || normalized === 'inativo') {
+    return 'inactive';
   }
 
   return null;
@@ -602,6 +622,7 @@ const FinanceApp = () => {
       lastName: '',
       company: tenant.name || '',
       plan: normalizeTenantPlan(tenant.plan) || 'Starter',
+      status: normalizeTenantStatus(tenant.subscription_status) || 'active',
       phone: '',
       email: ''
     });
@@ -623,11 +644,12 @@ const FinanceApp = () => {
     const lastName = editTenantForm.lastName.trim();
     const company = editTenantForm.company.trim();
     const plan = normalizeTenantPlan(editTenantForm.plan);
+    const status = normalizeTenantStatus(editTenantForm.status);
     const phone = editTenantForm.phone.trim();
     const email = editTenantForm.email.trim();
 
-    if (!firstName || !plan || !phone || !email) {
-      setErrorMessage('Preencha os campos obrigatórios: Nome, Plano, Telefone e Email');
+    if (!firstName || !plan || !status || !phone || !email) {
+      setErrorMessage('Preencha os campos obrigatórios: Nome, Plano, Status, Telefone e Email');
       return;
     }
 
@@ -644,7 +666,7 @@ const FinanceApp = () => {
       name: tenantName,
       slug: tenantSlug,
       plan,
-      subscriptionStatus: 'active',
+      subscriptionStatus: status,
       ownerName,
       contactPhone: phone,
       contactEmail: email
@@ -665,11 +687,12 @@ const FinanceApp = () => {
     const lastName = createTenantForm.lastName.trim();
     const company = createTenantForm.company.trim();
     const plan = normalizeTenantPlan(createTenantForm.plan);
+    const status = normalizeTenantStatus(createTenantForm.status);
     const phone = createTenantForm.phone.trim();
     const email = createTenantForm.email.trim();
 
-    if (!firstName || !plan || !phone || !email) {
-      setErrorMessage('Preencha os campos obrigatórios: Nome, Plano, Telefone e Email');
+    if (!firstName || !plan || !status || !phone || !email) {
+      setErrorMessage('Preencha os campos obrigatórios: Nome, Plano, Status, Telefone e Email');
       return;
     }
 
@@ -689,7 +712,7 @@ const FinanceApp = () => {
           name: tenantName,
           slug: tenantSlug,
           plan,
-          subscriptionStatus: 'active',
+          subscriptionStatus: status,
           ownerName,
           contactPhone: phone,
           contactEmail: email
@@ -1318,6 +1341,15 @@ const FinanceApp = () => {
                             <option key={planOption} value={planOption}>{planOption}</option>
                           ))}
                         </select>
+                        <select
+                          value={createTenantForm.status}
+                          onChange={(event) => setCreateTenantForm((current) => ({ ...current, status: event.target.value }))}
+                          className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                        >
+                          {TENANT_STATUSES.map((statusOption) => (
+                            <option key={statusOption.value} value={statusOption.value}>{statusOption.label}</option>
+                          ))}
+                        </select>
                         <Field value={createTenantForm.phone} onChange={(value) => setCreateTenantForm((current) => ({ ...current, phone: value }))} placeholder="Telefone *" />
                         <Field type="email" value={createTenantForm.email} onChange={(value) => setCreateTenantForm((current) => ({ ...current, email: value }))} placeholder="Email *" />
                       </div>
@@ -1357,6 +1389,15 @@ const FinanceApp = () => {
                       >
                         {TENANT_PLANS.map((planOption) => (
                           <option key={planOption} value={planOption}>{planOption}</option>
+                        ))}
+                      </select>
+                      <select
+                        value={editTenantForm.status}
+                        onChange={(event) => setEditTenantForm((current) => ({ ...current, status: event.target.value }))}
+                        className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                      >
+                        {TENANT_STATUSES.map((statusOption) => (
+                          <option key={statusOption.value} value={statusOption.value}>{statusOption.label}</option>
                         ))}
                       </select>
                       <Field value={editTenantForm.phone} onChange={(value) => setEditTenantForm((current) => ({ ...current, phone: value }))} placeholder="Telefone *" />
