@@ -67,18 +67,18 @@ const normalizeTenantStatus = (value) => {
   return null;
 };
 
-const applyTenantUserStatus = async (tenantId, status) => {
+const applyTenantUserStatus = async (db, tenantId, status) => {
   if (!runtimeCapabilities.hasUsersTenantId) {
     return;
   }
 
   if (status === 'inactive') {
-    await pool.query('UPDATE users SET active = false WHERE tenant_id = $1', [tenantId]);
+    await db.query('UPDATE users SET active = false WHERE tenant_id = $1', [tenantId]);
     return;
   }
 
   if (status === 'active') {
-    await pool.query(
+    await db.query(
       `UPDATE users
        SET active = true
        WHERE tenant_id = $1 AND role IN ('admin', 'owner')`,
@@ -952,6 +952,11 @@ app.post('/api/platform/tenants', authenticateToken, requirePlatformAdmin, async
   const slug = normalizeTenantSlug(req.body?.slug);
   const plan = normalizeTenantPlan(req.body?.plan || 'Starter');
   const subscriptionStatus = normalizeTenantStatus(req.body?.subscriptionStatus || 'active');
+  const createAdminUser = req.body?.createAdminUser === true;
+  const ownerName = String(req.body?.ownerName || '').trim();
+  const adminName = String(req.body?.adminName || ownerName || name || 'Administrador').trim();
+  const adminEmail = String(req.body?.adminEmail || req.body?.contactEmail || '').trim().toLowerCase();
+  const adminPassword = String(req.body?.adminPassword || '').trim();
 
   if (!name) {
     return res.status(400).json({ error: 'Nome do tenant é obrigatório' });
@@ -973,23 +978,64 @@ app.post('/api/platform/tenants', authenticateToken, requirePlatformAdmin, async
     return res.status(400).json({ error: `Status inválido. Use apenas: ${allowedTenantStatuses.join(', ')}` });
   }
 
+  if (createAdminUser && !runtimeCapabilities.hasUsersTenantId) {
+    return res.status(400).json({ error: 'Não é possível criar admin automaticamente neste ambiente sem users.tenant_id' });
+  }
+
+  if (createAdminUser && !adminEmail) {
+    return res.status(400).json({ error: 'E-mail do usuário admin é obrigatório quando a criação automática estiver ativa' });
+  }
+
+  if (createAdminUser && !adminPassword) {
+    return res.status(400).json({ error: 'Senha do usuário admin é obrigatória quando a criação automática estiver ativa' });
+  }
+
+  if (createAdminUser && adminPassword.length < 6) {
+    return res.status(400).json({ error: 'A senha do usuário admin deve ter ao menos 6 caracteres' });
+  }
+
+  const client = await pool.connect();
+
   try {
-    const result = await pool.query(
+    await client.query('BEGIN');
+
+    const result = await client.query(
       `INSERT INTO tenants (name, slug, plan, subscription_status)
        VALUES ($1, $2, $3, $4)
        RETURNING id, name, slug, plan, subscription_status, created_at`,
       [name, slug, plan, subscriptionStatus]
     );
 
-    await applyTenantUserStatus(result.rows[0].id, subscriptionStatus);
+    const tenant = result.rows[0];
 
-    return res.status(201).json(result.rows[0]);
+    if (createAdminUser) {
+      const passwordHash = await bcrypt.hash(adminPassword, 10);
+
+      await client.query(
+        `INSERT INTO users (tenant_id, name, email, password_hash, role, active)
+         VALUES ($1, $2, $3, $4, 'admin', $5)`,
+        [tenant.id, adminName, adminEmail, passwordHash, subscriptionStatus === 'active']
+      );
+    }
+
+    await applyTenantUserStatus(client, tenant.id, subscriptionStatus);
+    await client.query('COMMIT');
+
+    return res.status(201).json(tenant);
   } catch (error) {
+    await client.query('ROLLBACK');
+
     if (error.code === '23505') {
+      if (String(error.constraint || '').includes('users')) {
+        return res.status(409).json({ error: 'Já existe usuário com este e-mail' });
+      }
+
       return res.status(409).json({ error: 'Já existe tenant com este slug' });
     }
 
     return res.status(500).json({ error: error.message });
+  } finally {
+    client.release();
   }
 });
 
@@ -1008,6 +1054,11 @@ app.patch('/api/platform/tenants/:id', authenticateToken, requirePlatformAdmin, 
   const nextSlug = req.body?.slug !== undefined ? normalizeTenantSlug(req.body.slug) : null;
   const nextPlan = req.body?.plan !== undefined ? normalizeTenantPlan(req.body.plan) : null;
   const nextStatus = req.body?.subscriptionStatus !== undefined ? normalizeTenantStatus(req.body.subscriptionStatus) : null;
+  const createAdminUser = req.body?.createAdminUser === true;
+  const ownerName = String(req.body?.ownerName || '').trim();
+  const adminName = String(req.body?.adminName || ownerName || nextName || '').trim();
+  const adminEmail = String(req.body?.adminEmail || '').trim().toLowerCase();
+  const adminPassword = String(req.body?.adminPassword || '').trim();
 
   if (nextName !== null && !nextName) {
     return res.status(400).json({ error: 'Nome do tenant não pode ficar vazio' });
@@ -1029,12 +1080,32 @@ app.patch('/api/platform/tenants/:id', authenticateToken, requirePlatformAdmin, 
     return res.status(400).json({ error: `Status inválido. Use apenas: ${allowedTenantStatuses.join(', ')}` });
   }
 
-  if (nextName === null && nextSlug === null && nextPlan === null && nextStatus === null) {
+  if (createAdminUser && !runtimeCapabilities.hasUsersTenantId) {
+    return res.status(400).json({ error: 'Não é possível criar/resetar admin automaticamente neste ambiente sem users.tenant_id' });
+  }
+
+  if (createAdminUser && !adminEmail) {
+    return res.status(400).json({ error: 'E-mail do usuário admin é obrigatório quando a criação/reset estiver ativa' });
+  }
+
+  if (createAdminUser && !adminPassword) {
+    return res.status(400).json({ error: 'Senha do usuário admin é obrigatória quando a criação/reset estiver ativa' });
+  }
+
+  if (createAdminUser && adminPassword.length < 6) {
+    return res.status(400).json({ error: 'A senha do usuário admin deve ter ao menos 6 caracteres' });
+  }
+
+  if (nextName === null && nextSlug === null && nextPlan === null && nextStatus === null && !createAdminUser) {
     return res.status(400).json({ error: 'Informe ao menos um campo para atualização' });
   }
 
+  const client = await pool.connect();
+
   try {
-    const currentResult = await pool.query(
+    await client.query('BEGIN');
+
+    const currentResult = await client.query(
       'SELECT id, slug FROM tenants WHERE id::text = $1 LIMIT 1',
       [targetId]
     );
@@ -1049,7 +1120,7 @@ app.patch('/api/platform/tenants/:id', authenticateToken, requirePlatformAdmin, 
       return res.status(400).json({ error: 'O tenant padrão inicial tem slug protegido e não pode ser alterado' });
     }
 
-    const result = await pool.query(
+    const result = await client.query(
       `UPDATE tenants
        SET name = COALESCE($1, name),
            slug = COALESCE($2, slug),
@@ -1060,15 +1131,56 @@ app.patch('/api/platform/tenants/:id', authenticateToken, requirePlatformAdmin, 
       [nextName, nextSlug, nextPlan, nextStatus, targetId]
     );
 
-    await applyTenantUserStatus(result.rows[0].id, result.rows[0].subscription_status);
+    const tenant = result.rows[0];
 
-    return res.json(result.rows[0]);
+    if (createAdminUser) {
+      const passwordHash = await bcrypt.hash(adminPassword, 10);
+      const existingAdmin = await client.query(
+        `SELECT id
+         FROM users
+         WHERE tenant_id = $1 AND role IN ('admin', 'owner')
+         ORDER BY created_at ASC, id ASC
+         LIMIT 1`,
+        [tenant.id]
+      );
+
+      if (existingAdmin.rows.length > 0) {
+        await client.query(
+          `UPDATE users
+           SET name = $1,
+               email = $2,
+               password_hash = $3,
+               active = $4
+           WHERE id = $5`,
+          [adminName || tenant.name, adminEmail, passwordHash, tenant.subscription_status === 'active', existingAdmin.rows[0].id]
+        );
+      } else {
+        await client.query(
+          `INSERT INTO users (tenant_id, name, email, password_hash, role, active)
+           VALUES ($1, $2, $3, $4, 'admin', $5)`,
+          [tenant.id, adminName || tenant.name, adminEmail, passwordHash, tenant.subscription_status === 'active']
+        );
+      }
+    }
+
+    await applyTenantUserStatus(client, tenant.id, tenant.subscription_status);
+    await client.query('COMMIT');
+
+    return res.json(tenant);
   } catch (error) {
+    await client.query('ROLLBACK');
+
     if (error.code === '23505') {
+      if (String(error.constraint || '').includes('users')) {
+        return res.status(409).json({ error: 'Já existe usuário com este e-mail' });
+      }
+
       return res.status(409).json({ error: 'Já existe tenant com este slug' });
     }
 
     return res.status(500).json({ error: error.message });
+  } finally {
+    client.release();
   }
 });
 

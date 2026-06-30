@@ -43,7 +43,10 @@ const emptyCreateTenantForm = () => ({
   plan: 'Starter',
   status: 'active',
   phone: '',
-  email: ''
+  email: '',
+  createAdminUser: true,
+  adminEmail: '',
+  adminPassword: ''
 });
 const emptyEditTenantForm = () => ({
   firstName: '',
@@ -52,7 +55,10 @@ const emptyEditTenantForm = () => ({
   plan: 'Starter',
   status: 'active',
   phone: '',
-  email: ''
+  email: '',
+  createAdminUser: false,
+  adminEmail: '',
+  adminPassword: ''
 });
 const defaultTenantSort = () => ({ key: 'name', direction: 'asc' });
 const isMonthValueValid = (value) => /^\d{4}-\d{2}$/.test(String(value || ''));
@@ -624,7 +630,10 @@ const FinanceApp = () => {
       plan: normalizeTenantPlan(tenant.plan) || 'Starter',
       status: normalizeTenantStatus(tenant.subscription_status) || 'active',
       phone: '',
-      email: ''
+      email: '',
+      createAdminUser: false,
+      adminEmail: '',
+      adminPassword: ''
     });
     clearMessages();
   };
@@ -647,9 +656,22 @@ const FinanceApp = () => {
     const status = normalizeTenantStatus(editTenantForm.status);
     const phone = editTenantForm.phone.trim();
     const email = editTenantForm.email.trim();
+    const createAdminUser = editTenantForm.createAdminUser === true;
+    const adminEmail = editTenantForm.adminEmail.trim().toLowerCase();
+    const adminPassword = editTenantForm.adminPassword.trim();
 
     if (!firstName || !plan || !status || !phone || !email) {
       setErrorMessage('Preencha os campos obrigatórios: Nome, Plano, Status, Telefone e Email');
+      return;
+    }
+
+    if (createAdminUser && !adminEmail) {
+      setErrorMessage('Preencha o e-mail do usuário admin');
+      return;
+    }
+
+    if (createAdminUser && !adminPassword) {
+      setErrorMessage('Preencha a senha do usuário admin');
       return;
     }
 
@@ -669,7 +691,11 @@ const FinanceApp = () => {
       subscriptionStatus: status,
       ownerName,
       contactPhone: phone,
-      contactEmail: email
+      contactEmail: email,
+      createAdminUser,
+      adminName: ownerName || firstName,
+      adminEmail: createAdminUser ? adminEmail : undefined,
+      adminPassword: createAdminUser ? adminPassword : undefined
     };
 
     await runMutation(async () => {
@@ -690,9 +716,22 @@ const FinanceApp = () => {
     const status = normalizeTenantStatus(createTenantForm.status);
     const phone = createTenantForm.phone.trim();
     const email = createTenantForm.email.trim();
+    const createAdminUser = createTenantForm.createAdminUser === true;
+    const adminEmail = createTenantForm.adminEmail.trim().toLowerCase();
+    const adminPassword = createTenantForm.adminPassword.trim();
 
     if (!firstName || !plan || !status || !phone || !email) {
       setErrorMessage('Preencha os campos obrigatórios: Nome, Plano, Status, Telefone e Email');
+      return;
+    }
+
+    if (createAdminUser && !adminEmail) {
+      setErrorMessage('Preencha o e-mail do usuário admin');
+      return;
+    }
+
+    if (createAdminUser && !adminPassword) {
+      setErrorMessage('Preencha a senha do usuário admin');
       return;
     }
 
@@ -715,7 +754,11 @@ const FinanceApp = () => {
           subscriptionStatus: status,
           ownerName,
           contactPhone: phone,
-          contactEmail: email
+          contactEmail: email,
+          createAdminUser,
+          adminName: ownerName || firstName,
+          adminEmail: createAdminUser ? adminEmail : undefined,
+          adminPassword: createAdminUser ? adminPassword : undefined
         })
       });
 
@@ -837,6 +880,17 @@ const FinanceApp = () => {
 
     return tenantSortConfig.direction === 'asc' ? '↑' : '↓';
   };
+
+  const editingTenantHasAdmin = useMemo(() => {
+    if (!editingTenantId) {
+      return false;
+    }
+
+    return platformUsers.some((platformUser) => (
+      String(platformUser.tenantId || '') === String(editingTenantId)
+      && (platformUser.role === 'admin' || platformUser.role === 'owner')
+    ));
+  }, [platformUsers, editingTenantId]);
 
   const distributionItems = [
     { label: 'Compras', total: relatorio.totalCompras, className: 'bg-blue-500' },
@@ -1353,6 +1407,34 @@ const FinanceApp = () => {
                         <Field value={createTenantForm.phone} onChange={(value) => setCreateTenantForm((current) => ({ ...current, phone: value }))} placeholder="Telefone *" />
                         <Field type="email" value={createTenantForm.email} onChange={(value) => setCreateTenantForm((current) => ({ ...current, email: value }))} placeholder="Email *" />
                       </div>
+                      <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
+                        <label className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700">
+                          <input
+                            type="checkbox"
+                            checked={createTenantForm.createAdminUser}
+                            onChange={(event) => setCreateTenantForm((current) => ({ ...current, createAdminUser: event.target.checked }))}
+                            className="h-4 w-4 rounded border-slate-300"
+                          />
+                          Criar usuário admin no cadastro do tenant
+                        </label>
+
+                        {createTenantForm.createAdminUser && (
+                          <div className="mt-3 grid gap-3 md:grid-cols-2">
+                            <Field
+                              type="email"
+                              value={createTenantForm.adminEmail}
+                              onChange={(value) => setCreateTenantForm((current) => ({ ...current, adminEmail: value }))}
+                              placeholder="E-mail do admin *"
+                            />
+                            <Field
+                              type="password"
+                              value={createTenantForm.adminPassword}
+                              onChange={(value) => setCreateTenantForm((current) => ({ ...current, adminPassword: value }))}
+                              placeholder="Senha do admin *"
+                            />
+                          </div>
+                        )}
+                      </div>
                       <p className="mt-3 text-xs text-slate-500">Campos com * são obrigatórios. Sobrenome e Empresa são opcionais.</p>
                       <div className="mt-4">
                         <PrimaryButton
@@ -1402,6 +1484,37 @@ const FinanceApp = () => {
                       </select>
                       <Field value={editTenantForm.phone} onChange={(value) => setEditTenantForm((current) => ({ ...current, phone: value }))} placeholder="Telefone *" />
                       <Field type="email" value={editTenantForm.email} onChange={(value) => setEditTenantForm((current) => ({ ...current, email: value }))} placeholder="Email *" />
+                    </div>
+                    <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
+                      <p className="mb-3 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                        {editingTenantHasAdmin ? 'Ação detectada: reset de admin existente' : 'Ação detectada: criação de admin para o tenant'}
+                      </p>
+                      <label className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={editTenantForm.createAdminUser}
+                          onChange={(event) => setEditTenantForm((current) => ({ ...current, createAdminUser: event.target.checked }))}
+                          className="h-4 w-4 rounded border-slate-300"
+                        />
+                        Criar ou resetar usuário admin do tenant
+                      </label>
+
+                      {editTenantForm.createAdminUser && (
+                        <div className="mt-3 grid gap-3 md:grid-cols-2">
+                          <Field
+                            type="email"
+                            value={editTenantForm.adminEmail}
+                            onChange={(value) => setEditTenantForm((current) => ({ ...current, adminEmail: value }))}
+                            placeholder="E-mail do admin *"
+                          />
+                          <Field
+                            type="password"
+                            value={editTenantForm.adminPassword}
+                            onChange={(value) => setEditTenantForm((current) => ({ ...current, adminPassword: value }))}
+                            placeholder="Senha do admin *"
+                          />
+                        </div>
+                      )}
                     </div>
                     <p className="mt-3 text-xs text-slate-500">Campos com * são obrigatórios. Sobrenome e Empresa são opcionais.</p>
                     <div className="mt-4">
