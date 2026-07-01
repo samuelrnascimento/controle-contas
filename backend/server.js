@@ -257,7 +257,8 @@ const ensureSchema = async () => {
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
-    ALTER TABLE investimentos ADD COLUMN IF NOT EXISTS tenant_id INTEGER;
+    ALTER TABLE investimentos ADD COLUMN IF NOT EXISTS tenant_id TEXT;
+    ALTER TABLE investimentos ALTER COLUMN tenant_id TYPE TEXT USING tenant_id::text;
 
     CREATE TABLE IF NOT EXISTS estoque (
       id SERIAL PRIMARY KEY,
