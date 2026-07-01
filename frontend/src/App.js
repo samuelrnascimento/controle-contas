@@ -13,6 +13,7 @@ import {
   PlusCircle,
   Shield,
   ShoppingCart,
+  Tag,
   UserPlus,
   Users,
   Trash2,
@@ -25,6 +26,8 @@ const TOKEN_STORAGE_KEY = 'finansam-auth-token';
 const TENANT_VIEW_STORAGE_KEY = 'finansam-platform-tenant-view';
 const MONTHLY_VIEW_STORAGE_KEY = 'finansam-monthly-view';
 const TENANT_PLANS = ['Starter', 'Smart', 'Premium'];
+const DEFAULT_CONTA_CATEGORIES = ['Água', 'Luz', 'Telefone', 'Gás', 'Internet', 'Condomínio', 'Outros'];
+const DEFAULT_INVESTIMENTO_CATEGORIES = ['CDB', 'Tesouro Direto', 'Poupança', 'Fundos', 'Ações', 'Outros'];
 const TENANT_STATUSES = [
   { value: 'active', label: 'Ativo' },
   { value: 'inactive', label: 'Inativo' }
@@ -34,9 +37,9 @@ const defaultMonth = new Date().toISOString().slice(0, 7);
 const defaultDate = new Date().toISOString().slice(0, 10);
 
 const emptyCompra = () => ({ item: '', quantidade: '', valor: '', mes: defaultMonth });
-const emptyConta = () => ({ tipo: 'Água', valor: '', mes: defaultMonth });
+const emptyConta = () => ({ tipo: DEFAULT_CONTA_CATEGORIES[0], valor: '', mes: defaultMonth });
 const emptyManutencao = () => ({ descricao: '', valor: '', data: defaultDate });
-const emptyInvestimento = () => ({ descricao: '', valor: '', mes: defaultMonth });
+const emptyInvestimento = () => ({ descricao: DEFAULT_INVESTIMENTO_CATEGORIES[0], valor: '', mes: defaultMonth });
 const emptyNovoUsuario = () => ({ name: '', email: '', password: '' });
 const emptyCreateTenantForm = () => ({
   firstName: '',
@@ -187,7 +190,10 @@ const tabs = [
   { key: 'relatorios', label: 'Relatórios', icon: BarChart3 }
 ];
 
-const adminTabs = [{ key: 'admin', label: 'Portal Admin', icon: Shield }];
+const adminTabs = [
+  { key: 'admin', label: 'Portal Admin', icon: Shield },
+  { key: 'categories', label: 'Categorias', icon: Tag }
+];
 const platformTabs = [{ key: 'platform', label: 'Plataforma', icon: Building2 }];
 
 const formatCurrency = (value) => currencyFormatter.format(Number(value) || 0);
@@ -203,7 +209,7 @@ const normalizeError = (error) => {
 const valueToPercent = (value, total) => (Number(value) / Number(total)) * 100;
 
 const SectionHeader = ({ title, description }) => (
-  <div>
+  <div className="rounded-[24px] border border-slate-200/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.92)_0%,rgba(248,250,252,0.98)_100%)] px-5 py-5 shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
     <h2 className="text-3xl font-black tracking-tight text-slate-900">{title}</h2>
     <p className="mt-2 text-slate-600">{description}</p>
   </div>
@@ -244,7 +250,7 @@ const FilterMonth = ({ value, onChange }) => (
 );
 
 const MetricCard = ({ title, value, tone }) => (
-  <div className={`rounded-3xl p-5 ${tone}`}>
+  <div className={`rounded-[28px] border border-white/50 p-5 shadow-[0_14px_35px_rgba(15,23,42,0.08)] ${tone}`}>
     <p className="text-sm font-semibold uppercase tracking-[0.18em]">{title}</p>
     <p className="mt-3 text-3xl font-black">{value}</p>
   </div>
@@ -258,26 +264,26 @@ const SummaryRow = ({ label, value }) => (
 );
 
 const DataTable = ({ headers, rows, emptyMessage }) => (
-  <div className="mt-6 overflow-x-auto rounded-3xl border border-slate-200">
-    <table className="min-w-full bg-white text-left text-sm">
-      <thead className="bg-slate-100 text-slate-600">
+  <div className="mt-6 overflow-x-auto rounded-[28px] border border-slate-200/80 bg-white/95 shadow-[0_16px_40px_rgba(15,23,42,0.06)]">
+    <table className="min-w-full bg-transparent text-left text-sm">
+      <thead className="bg-[linear-gradient(135deg,#f8fafc_0%,#eef2f7_100%)] text-slate-600">
         <tr>
           {headers.map((header) => (
-            <th key={header} className="px-4 py-3 font-semibold">{header}</th>
+            <th key={header} className="px-4 py-4 font-semibold uppercase tracking-[0.08em] text-slate-500">{header}</th>
           ))}
         </tr>
       </thead>
       <tbody>
         {rows.map((row, index) => (
-          <tr key={`row-${index}`} className="border-t border-slate-100 text-slate-700">
+          <tr key={`row-${index}`} className="border-t border-slate-100/90 text-slate-700 transition hover:bg-slate-50/80">
             {row.map((cell, cellIndex) => (
-              <td key={`cell-${index}-${cellIndex}`} className="px-4 py-3 align-top">{cell}</td>
+              <td key={`cell-${index}-${cellIndex}`} className="px-4 py-4 align-top">{cell}</td>
             ))}
           </tr>
         ))}
       </tbody>
     </table>
-    {rows.length === 0 && <p className="px-4 py-6 text-center text-sm text-slate-500">{emptyMessage}</p>}
+    {rows.length === 0 && <p className="px-4 py-8 text-center text-sm text-slate-500">{emptyMessage}</p>}
   </div>
 );
 
@@ -289,6 +295,7 @@ const FinanceApp = () => {
   const [activeTab, setActiveTab] = useState('compras');
   const [compras, setCompras] = useState([]);
   const [contas, setContas] = useState([]);
+  const [categorias, setCategorias] = useState([]);
   const [investimentos, setInvestimentos] = useState([]);
   const [manutencoes, setManutencoes] = useState([]);
   const [estoque, setEstoque] = useState([]);
@@ -306,6 +313,8 @@ const FinanceApp = () => {
   const [novoInvestimento, setNovoInvestimento] = useState(emptyInvestimento());
   const [novaManutencao, setNovaManutencao] = useState(emptyManutencao());
   const [novoUsuario, setNovoUsuario] = useState(emptyNovoUsuario());
+  const [novaCategoriaConta, setNovaCategoriaConta] = useState('');
+  const [novaCategoriaInvestimento, setNovaCategoriaInvestimento] = useState('');
   const [showCreateTenantForm, setShowCreateTenantForm] = useState(false);
   const [createTenantForm, setCreateTenantForm] = useState(emptyCreateTenantForm());
   const [editTenantForm, setEditTenantForm] = useState(emptyEditTenantForm());
@@ -379,6 +388,7 @@ const FinanceApp = () => {
       setPlatformAdmins(adminsData);
       setCompras([]);
       setContas([]);
+      setCategorias([]);
       setInvestimentos([]);
       setManutencoes([]);
       setEstoque([]);
@@ -390,6 +400,7 @@ const FinanceApp = () => {
     const requests = [
       apiFetch('/compras', { authToken }),
       apiFetch('/contas', { authToken }),
+      apiFetch('/categories', { authToken }),
       apiFetch('/investimentos', { authToken }),
       apiFetch('/manutencoes', { authToken }),
       apiFetch('/estoque', { authToken })
@@ -399,10 +410,11 @@ const FinanceApp = () => {
       requests.push(apiFetch('/users', { authToken }));
     }
 
-    const [comprasData, contasData, investimentosData, manutencoesData, estoqueData, usersData] = await Promise.all(requests);
+    const [comprasData, contasData, categoriasData, investimentosData, manutencoesData, estoqueData, usersData] = await Promise.all(requests);
 
     setCompras(comprasData);
     setContas(contasData);
+    setCategorias(categoriasData);
     setInvestimentos(investimentosData);
     setManutencoes(manutencoesData);
     setEstoque(estoqueData);
@@ -471,6 +483,7 @@ const FinanceApp = () => {
     setUser(null);
     setCompras([]);
     setContas([]);
+    setCategorias([]);
     setInvestimentos([]);
     setManutencoes([]);
     setEstoque([]);
@@ -581,6 +594,30 @@ const FinanceApp = () => {
     }, 'Investimento adicionado com sucesso');
   };
 
+  const adicionarCategoria = async (scope, rawName) => {
+    const name = rawName.trim();
+
+    if (!name) {
+      setErrorMessage('Informe o nome da categoria');
+      return;
+    }
+
+    await runMutation(async () => {
+      await apiFetch('/categories', {
+        method: 'POST',
+        body: JSON.stringify({ scope, name })
+      });
+
+      if (scope === 'contas') {
+        setNovaCategoriaConta('');
+      }
+
+      if (scope === 'investimentos') {
+        setNovaCategoriaInvestimento('');
+      }
+    }, 'Categoria adicionada com sucesso');
+  };
+
   const darBaixaEstoque = async (id) => {
     const quantidade = Number(baixasEstoque[id]);
 
@@ -602,6 +639,12 @@ const FinanceApp = () => {
     await runMutation(async () => {
       await apiFetch(path, { method: 'DELETE' });
     }, successText);
+  };
+
+  const excluirCategoria = async (categoryId) => {
+    await runMutation(async () => {
+      await apiFetch(`/categories/${categoryId}`, { method: 'DELETE' });
+    }, 'Categoria excluída com sucesso');
   };
 
   const criarUsuario = async () => {
@@ -925,6 +968,34 @@ const FinanceApp = () => {
     ));
   }, [platformUsers, editingTenantId]);
 
+  const categoriasConta = useMemo(() => {
+    const custom = categorias
+      .filter((categoria) => categoria.scope === 'contas')
+      .map((categoria) => categoria.name);
+
+    return Array.from(new Set([...DEFAULT_CONTA_CATEGORIES, ...custom]));
+  }, [categorias]);
+
+  const categoriasInvestimento = useMemo(() => {
+    const custom = categorias
+      .filter((categoria) => categoria.scope === 'investimentos')
+      .map((categoria) => categoria.name);
+
+    return Array.from(new Set([...DEFAULT_INVESTIMENTO_CATEGORIES, ...custom]));
+  }, [categorias]);
+
+  useEffect(() => {
+    if (categoriasConta.length > 0 && !categoriasConta.includes(novaConta.tipo)) {
+      setNovaConta((current) => ({ ...current, tipo: categoriasConta[0] }));
+    }
+  }, [categoriasConta, novaConta.tipo]);
+
+  useEffect(() => {
+    if (categoriasInvestimento.length > 0 && !categoriasInvestimento.includes(novoInvestimento.descricao)) {
+      setNovoInvestimento((current) => ({ ...current, descricao: categoriasInvestimento[0] }));
+    }
+  }, [categoriasInvestimento, novoInvestimento.descricao]);
+
   const distributionItems = [
     { label: 'Compras', total: relatorio.totalCompras, className: 'bg-blue-500' },
     { label: 'Contas', total: relatorio.totalContas, className: 'bg-emerald-500' },
@@ -1031,29 +1102,65 @@ const FinanceApp = () => {
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#f4efe6_0%,#fbfaf7_46%,#f3f6fb_100%)] px-4 py-6 text-slate-900 md:px-6 lg:px-10">
       <div className="mx-auto max-w-7xl">
-        <header className="mb-6 overflow-hidden rounded-[32px] bg-slate-950 text-white shadow-[0_24px_90px_rgba(15,23,42,0.35)]">
-          <div className="grid gap-8 px-8 py-8 lg:grid-cols-[1.2fr_0.8fr] lg:px-10">
-            <div>
-              <p className="text-sm uppercase tracking-[0.28em] text-emerald-300">Finansam</p>
-              <h1 className="mt-3 text-4xl font-black tracking-tight">Plataforma Adminsitrativa</h1>
-            </div>
-            <div className="grid gap-4 rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur">
-              <div>
-                <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Usuário ativo</p>
-                <p className="mt-2 text-2xl font-bold">{user.name}</p>
-                <p className="text-sm text-slate-300">{user.email}</p>
+        <header className="relative mb-6 overflow-hidden rounded-[36px] bg-[linear-gradient(135deg,#020617_0%,#0f172a_52%,#123047_100%)] text-white shadow-[0_24px_90px_rgba(15,23,42,0.35)]">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.18),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(56,189,248,0.14),transparent_26%)]" />
+
+          <div className="relative grid gap-8 px-8 py-8 lg:grid-cols-[1.15fr_0.85fr] lg:px-10">
+            <div className="rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur">
+              <p className="text-sm uppercase tracking-[0.32em] text-emerald-300">Finansam Control Center</p>
+              <h1 className="mt-3 max-w-3xl text-4xl font-black tracking-tight text-white">Plataforma Administrativa com visão operacional, financeira e governança por acesso.</h1>
+              <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-300">
+                Centralize lançamentos, usuários, categorias, estoque e relatórios em um ambiente único, com separação entre tenant e plataforma e leitura executiva da operação.
+              </p>
+
+              <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-4">
+                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-200">Escopo</p>
+                  <p className="mt-2 text-lg font-black text-white">{isPlatformAdmin ? 'Plataforma' : 'Tenant'}</p>
+                </div>
+                <div className="rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-4">
+                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-sky-200">Perfil</p>
+                  <p className="mt-2 text-lg font-black text-white">{isPlatformAdmin ? 'Super Admin' : isAdmin ? 'Admin' : 'Operacional'}</p>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-white/8 px-4 py-4">
+                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-300">Status</p>
+                  <p className="mt-2 text-lg font-black text-emerald-300">Sessão ativa</p>
+                </div>
               </div>
-              <div className="flex flex-wrap items-center gap-3">
-                <span className={`rounded-full px-3 py-1 text-sm font-semibold ${isAdmin ? 'bg-emerald-400/15 text-emerald-200' : 'bg-sky-400/15 text-sky-200'}`}>
-                  {isPlatformAdmin ? 'Super Admin da Plataforma' : isAdmin ? 'Proprietário / Admin' : 'Usuário operacional'}
-                </span>
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                  className="inline-flex items-center gap-2 rounded-full border border-white/15 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
-                >
-                  <LogOut size={16} /> Sair
-                </button>
+            </div>
+
+            <div className="grid gap-4">
+              <div className="rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Usuário ativo</p>
+                  <p className="mt-2 text-2xl font-bold text-white">{user.name}</p>
+                  <p className="text-sm text-slate-300">{user.email}</p>
+                </div>
+                <div className="mt-5 flex flex-wrap items-center gap-3">
+                  <span className={`rounded-full px-3 py-1 text-sm font-semibold ${isAdmin ? 'bg-emerald-400/15 text-emerald-200' : 'bg-sky-400/15 text-sky-200'}`}>
+                    {isPlatformAdmin ? 'Super Admin da Plataforma' : isAdmin ? 'Proprietário / Admin' : 'Usuário operacional'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="inline-flex items-center gap-2 rounded-full border border-white/15 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
+                  >
+                    <LogOut size={16} /> Sair
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4 backdrop-blur">
+                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Operação</p>
+                  <p className="mt-2 text-lg font-black text-white">Gestão centralizada</p>
+                  <p className="mt-1 text-sm text-slate-300">Dados persistidos e acesso controlado por perfil.</p>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4 backdrop-blur">
+                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Arquitetura</p>
+                  <p className="mt-2 text-lg font-black text-white">Multi contexto</p>
+                  <p className="mt-1 text-sm text-slate-300">Tenant e plataforma operando com governança isolada.</p>
+                </div>
               </div>
             </div>
           </div>
@@ -1074,7 +1181,8 @@ const FinanceApp = () => {
           </div>
         )}
 
-        <nav className="mb-6 flex flex-wrap gap-3 rounded-[28px] bg-white p-3 shadow-lg shadow-slate-200/70">
+        <nav className="mb-6 overflow-hidden rounded-[32px] border border-slate-200/70 bg-[linear-gradient(135deg,rgba(255,255,255,0.95)_0%,rgba(241,245,249,0.92)_100%)] p-3 shadow-[0_18px_55px_rgba(15,23,42,0.10)] backdrop-blur">
+          <div className="flex flex-wrap gap-3 rounded-[24px] border border-slate-200/80 bg-white/70 p-2">
           {(isPlatformAdmin ? platformTabs : [...tabs, ...(isAdmin ? adminTabs : [])]).map((tab) => {
             const Icon = tab.icon;
             const active = activeTab === tab.key;
@@ -1084,16 +1192,17 @@ const FinanceApp = () => {
                 key={tab.key}
                 type="button"
                 onClick={() => setActiveTab(tab.key)}
-                className={`inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold transition ${active ? 'bg-slate-950 text-white shadow-lg' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+                className={`inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold transition ${active ? 'bg-[linear-gradient(135deg,#020617_0%,#0f172a_58%,#123047_100%)] text-white shadow-[0_14px_30px_rgba(15,23,42,0.28)]' : 'border border-slate-200/80 bg-white/80 text-slate-700 hover:border-slate-300 hover:bg-slate-50'}`}
               >
-                <Icon size={18} /> {tab.label}
+                <Icon size={18} className={active ? 'text-emerald-300' : 'text-slate-500'} /> {tab.label}
               </button>
             );
           })}
+          </div>
         </nav>
 
         <section className="grid gap-6 lg:grid-cols-[1.5fr_0.5fr]">
-          <div className="rounded-[30px] bg-white p-6 shadow-xl shadow-slate-200/60">
+          <div className="rounded-[32px] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.97)_0%,rgba(248,250,252,0.95)_100%)] p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
             {activeTab === 'compras' && (
               <div>
                 <SectionHeader title="Compras do Mês" description="Toda compra alimenta automaticamente o estoque central." />
@@ -1132,13 +1241,9 @@ const FinanceApp = () => {
                     onChange={(event) => setNovaConta((current) => ({ ...current, tipo: event.target.value }))}
                     className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
                   >
-                    <option>Água</option>
-                    <option>Luz</option>
-                    <option>Telefone</option>
-                    <option>Gás</option>
-                    <option>Internet</option>
-                    <option>Condomínio</option>
-                    <option>Outros</option>
+                    {categoriasConta.map((categoria) => (
+                      <option key={categoria} value={categoria}>{categoria}</option>
+                    ))}
                   </select>
                   <Field type="number" value={novaConta.valor} onChange={(value) => setNovaConta((current) => ({ ...current, valor: value }))} placeholder="Valor" />
                   <Field type="month" value={novaConta.mes} onChange={(value) => setNovaConta((current) => ({ ...current, mes: value }))} />
@@ -1193,14 +1298,22 @@ const FinanceApp = () => {
               <div>
                 <SectionHeader title="Investimentos" description="Aportes mensais de investimentos e reservas." />
                 <div className="mt-6 grid gap-4 md:grid-cols-4">
-                  <Field value={novoInvestimento.descricao} onChange={(value) => setNovoInvestimento((current) => ({ ...current, descricao: value }))} placeholder="Descrição" />
+                  <select
+                    value={novoInvestimento.descricao}
+                    onChange={(event) => setNovoInvestimento((current) => ({ ...current, descricao: event.target.value }))}
+                    className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                  >
+                    {categoriasInvestimento.map((categoria) => (
+                      <option key={categoria} value={categoria}>{categoria}</option>
+                    ))}
+                  </select>
                   <Field type="number" value={novoInvestimento.valor} onChange={(value) => setNovoInvestimento((current) => ({ ...current, valor: value }))} placeholder="Valor" />
                   <Field type="month" value={novoInvestimento.mes} onChange={(value) => setNovoInvestimento((current) => ({ ...current, mes: value }))} />
                   <PrimaryButton icon={PlusCircle} onClick={adicionarInvestimento} disabled={loading} label="Adicionar" />
                 </div>
                 <FilterMonth value={mesFiltroInvestimentos} onChange={setMesFiltroInvestimentos} />
                 <DataTable
-                  headers={['Descrição', 'Valor', 'Mês', 'Ações']}
+                  headers={['Categoria', 'Valor', 'Mês', 'Ações']}
                   rows={investimentos.filter((investimento) => investimento.mes === mesFiltroInvestimentos).map((investimento) => [
                     investimento.descricao,
                     formatCurrency(investimento.valor),
@@ -1261,7 +1374,7 @@ const FinanceApp = () => {
                 </div>
 
                 <div className="mt-8 grid gap-6 xl:grid-cols-2">
-                  <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+                  <div className="rounded-[28px] border border-slate-200/80 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5 shadow-[0_12px_35px_rgba(15,23,42,0.05)]">
                     <h3 className="text-lg font-bold">Gastos por tipo de conta</h3>
                     <div className="mt-4 space-y-3">
                       {Object.keys(relatorio.contasPorTipo).length === 0 && <p className="text-sm text-slate-500">Sem contas no mês selecionado.</p>}
@@ -1283,7 +1396,7 @@ const FinanceApp = () => {
                     </div>
                   </div>
 
-                  <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+                  <div className="rounded-[28px] border border-slate-200/80 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5 shadow-[0_12px_35px_rgba(15,23,42,0.05)]">
                     <h3 className="text-lg font-bold">Distribuição geral</h3>
                     <div className="mt-4 space-y-4">
                       {distributionItems.map((item) => {
@@ -1312,7 +1425,7 @@ const FinanceApp = () => {
                 <SectionHeader title="Portal Administrativo" description="Gestão do proprietário: acessos, senhas e diagnóstico da migração para backend centralizado." />
 
                 <div className="mt-6 grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-                  <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+                  <div className="rounded-[28px] border border-slate-200/80 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5 shadow-[0_12px_35px_rgba(15,23,42,0.05)]">
                     <div className="flex items-center gap-3">
                       <UserPlus size={20} />
                       <h3 className="text-lg font-bold">Criar usuário operacional</h3>
@@ -1325,7 +1438,7 @@ const FinanceApp = () => {
                     </div>
                   </div>
 
-                  <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+                  <div className="rounded-[28px] border border-slate-200/80 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5 shadow-[0_12px_35px_rgba(15,23,42,0.05)]">
                     <div className="flex items-center gap-3">
                       <AlertCircle size={20} />
                       <h3 className="text-lg font-bold">Diagnóstico e migração</h3>
@@ -1340,7 +1453,7 @@ const FinanceApp = () => {
                   </div>
                 </div>
 
-                <div className="mt-6 rounded-3xl border border-slate-200 bg-white shadow-sm">
+                <div className="mt-6 rounded-[28px] border border-slate-200/80 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] shadow-[0_12px_35px_rgba(15,23,42,0.05)]">
                   <div className="border-b border-slate-200 px-5 py-4">
                     <h3 className="text-lg font-bold">Usuários cadastrados</h3>
                   </div>
@@ -1409,11 +1522,65 @@ const FinanceApp = () => {
               </div>
             )}
 
+            {activeTab === 'categories' && isAdmin && (
+              <div>
+                <SectionHeader title="Gerenciamento de Categorias" description="Cadastre categorias reutilizáveis para contas e investimentos." />
+
+                <div className="mt-6 space-y-6">
+                  <div className="rounded-[28px] border border-slate-200/80 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5 shadow-[0_12px_35px_rgba(15,23,42,0.05)]">
+                    <h3 className="text-lg font-bold">Categorias de Contas</h3>
+                    <div className="mt-4 flex flex-col gap-3 md:flex-row">
+                      <Field value={novaCategoriaConta} onChange={setNovaCategoriaConta} placeholder="Nome da categoria" />
+                      <PrimaryButton icon={PlusCircle} onClick={() => adicionarCategoria('contas', novaCategoriaConta)} disabled={loading} label="Adicionar" />
+                    </div>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {categorias.filter((categoria) => categoria.scope === 'contas').map((categoria) => (
+                        <button
+                          key={categoria.id}
+                          type="button"
+                          onClick={() => excluirCategoria(categoria.id)}
+                          className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                        >
+                          {categoria.name} <Trash2 size={14} />
+                        </button>
+                      ))}
+                      {categorias.filter((categoria) => categoria.scope === 'contas').length === 0 && (
+                        <p className="text-sm text-slate-500">Nenhuma categoria personalizada cadastrada.</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="rounded-[28px] border border-slate-200/80 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5 shadow-[0_12px_35px_rgba(15,23,42,0.05)]">
+                    <h3 className="text-lg font-bold">Categorias de Investimentos</h3>
+                    <div className="mt-4 flex flex-col gap-3 md:flex-row">
+                      <Field value={novaCategoriaInvestimento} onChange={setNovaCategoriaInvestimento} placeholder="Nome da categoria" />
+                      <PrimaryButton icon={PlusCircle} onClick={() => adicionarCategoria('investimentos', novaCategoriaInvestimento)} disabled={loading} label="Adicionar" />
+                    </div>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {categorias.filter((categoria) => categoria.scope === 'investimentos').map((categoria) => (
+                        <button
+                          key={categoria.id}
+                          type="button"
+                          onClick={() => excluirCategoria(categoria.id)}
+                          className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                        >
+                          {categoria.name} <Trash2 size={14} />
+                        </button>
+                      ))}
+                      {categorias.filter((categoria) => categoria.scope === 'investimentos').length === 0 && (
+                        <p className="text-sm text-slate-500">Nenhuma categoria personalizada cadastrada.</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {activeTab === 'platform' && isPlatformAdmin && (
               <div>
                 <SectionHeader title="Administração da Plataforma" description="Gerencie empresas (tenants) e usuários globais da ferramenta." />
 
-                <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-5">
+                <div className="mt-6 rounded-[28px] border border-slate-200/80 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5 shadow-[0_12px_35px_rgba(15,23,42,0.05)]">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <h3 className="text-lg font-bold">Criar tenant</h3>
                     {!showCreateTenantForm ? (
@@ -1511,7 +1678,7 @@ const FinanceApp = () => {
                 </div>
 
                 {editingTenantId && (
-                  <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-5">
+                  <div className="mt-6 rounded-[28px] border border-slate-200/80 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5 shadow-[0_12px_35px_rgba(15,23,42,0.05)]">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <h3 className="text-lg font-bold">Editar tenant</h3>
                       <button
@@ -1590,7 +1757,7 @@ const FinanceApp = () => {
                   </div>
                 )}
 
-                <div className="mt-6 rounded-3xl border border-slate-200 bg-white shadow-sm">
+                <div className="mt-6 rounded-[28px] border border-slate-200/80 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] shadow-[0_12px_35px_rgba(15,23,42,0.05)]">
                   <div className="border-b border-slate-200 px-5 py-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <h3 className="text-lg font-bold">Tenants cadastrados</h3>
@@ -1716,7 +1883,7 @@ const FinanceApp = () => {
                   </div>
                 </div>
 
-                <div className="mt-6 rounded-3xl border border-slate-200 bg-white shadow-sm">
+                <div className="mt-6 rounded-[28px] border border-slate-200/80 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] shadow-[0_12px_35px_rgba(15,23,42,0.05)]">
                   <div className="border-b border-slate-200 px-5 py-4">
                     <h3 className="text-lg font-bold">Super admins da plataforma</h3>
                   </div>
@@ -1762,7 +1929,7 @@ const FinanceApp = () => {
                   </div>
                 </div>
 
-                <div className="mt-6 rounded-3xl border border-slate-200 bg-white shadow-sm">
+                <div className="mt-6 rounded-[28px] border border-slate-200/80 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] shadow-[0_12px_35px_rgba(15,23,42,0.05)]">
                   <div className="border-b border-slate-200 px-5 py-4">
                     <h3 className="text-lg font-bold">Usuários da plataforma</h3>
                   </div>
@@ -1827,6 +1994,71 @@ const FinanceApp = () => {
             </div>
           </aside>
         </section>
+
+        <footer className="relative mt-8 overflow-hidden rounded-[36px] bg-[linear-gradient(135deg,#020617_0%,#0f172a_55%,#123047_100%)] px-6 py-7 text-white shadow-[0_24px_90px_rgba(15,23,42,0.28)] md:px-8">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.16),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(56,189,248,0.12),transparent_26%)]" />
+
+          <div className="relative grid gap-6 xl:grid-cols-[1.15fr_0.95fr]">
+            <div className="rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur">
+              <p className="text-xs font-bold uppercase tracking-[0.32em] text-emerald-300">Finansam Workspace</p>
+              <h3 className="mt-3 max-w-2xl text-3xl font-black tracking-tight text-white">Gestão financeira operacional com leitura executiva e governança por tenant.</h3>
+              <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-300">
+                Uma camada única para registrar lançamentos, organizar categorias reutilizáveis, controlar estoque e sustentar a operação com autenticação, segregação de perfis e visão administrativa centralizada.
+              </p>
+
+              <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-4">
+                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-200">Escopo</p>
+                  <p className="mt-2 text-lg font-black text-white">{isPlatformAdmin ? 'Plataforma' : 'Tenant'}</p>
+                </div>
+                <div className="rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-4">
+                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-sky-200">Sessão</p>
+                  <p className="mt-2 truncate text-lg font-black text-white">{user.name}</p>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-white/8 px-4 py-4">
+                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-300">Status</p>
+                  <p className="mt-2 text-lg font-black text-emerald-300">Operacional</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr] xl:grid-cols-1">
+              <div className="rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur">
+                <p className="text-sm font-bold uppercase tracking-[0.2em] text-slate-300">Módulos Estratégicos</p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {['Compras', 'Contas', 'Investimentos', 'Estoque', 'Categorias', 'Relatórios'].map((item) => (
+                    <span key={item} className="rounded-full border border-white/10 bg-white/10 px-3 py-2 text-sm font-semibold text-slate-100">
+                      {item}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur">
+                <p className="text-sm font-bold uppercase tracking-[0.2em] text-slate-300">Painel Executivo</p>
+                <div className="mt-4 space-y-3 text-sm text-slate-200">
+                  <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-slate-950/30 px-4 py-3">
+                    <span>Usuário ativo</span>
+                    <span className="font-bold text-white">{user.name}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-slate-950/30 px-4 py-3">
+                    <span>Governança</span>
+                    <span className="font-bold text-white">{isPlatformAdmin ? 'Global' : 'Segmentada'}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-slate-950/30 px-4 py-3">
+                    <span>Camada de dados</span>
+                    <span className="font-bold text-emerald-300">Centralizada</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="relative mt-6 flex flex-col gap-3 border-t border-white/10 pt-5 text-sm text-slate-400 md:flex-row md:items-center md:justify-between">
+            <p className="font-medium text-slate-300">Powered by SMCorp</p>
+            <p>Finansam {new Date().getFullYear()} • Plataforma administrativa com padrão corporativo</p>
+          </div>
+        </footer>
       </div>
     </div>
   );

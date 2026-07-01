@@ -30,11 +30,13 @@ const runtimeCapabilities = {
   hasContasTenantId: false,
   hasManutencoesTenantId: false,
   hasEstoqueTenantId: false,
-  hasInvestimentosTenantId: false
+  hasInvestimentosTenantId: false,
+  hasCategoriasTenantId: false
 };
 
 const allowedTenantPlans = ['Starter', 'Smart', 'Premium'];
 const allowedTenantStatuses = ['active', 'inactive'];
+const allowedCategoryScopes = ['contas', 'investimentos'];
 
 const normalizeTenantPlan = (value) => {
   const normalized = String(value || '').trim().toLowerCase();
@@ -127,6 +129,11 @@ const createPlatformToken = (user) => jwt.sign(
 const parseAmount = (value) => {
   const amount = Number(value);
   return Number.isFinite(amount) ? amount : null;
+};
+
+const normalizeCategoryScope = (value) => {
+  const normalized = String(value || '').trim().toLowerCase();
+  return allowedCategoryScopes.includes(normalized) ? normalized : null;
 };
 
 const normalizeTenantSlug = (value) => String(value || '')
@@ -260,6 +267,17 @@ const ensureSchema = async () => {
     ALTER TABLE investimentos ADD COLUMN IF NOT EXISTS tenant_id TEXT;
     ALTER TABLE investimentos ALTER COLUMN tenant_id TYPE TEXT USING tenant_id::text;
 
+    CREATE TABLE IF NOT EXISTS categorias (
+      id SERIAL PRIMARY KEY,
+      scope VARCHAR(30) NOT NULL,
+      name VARCHAR(120) NOT NULL,
+      tenant_id TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_categorias_scope ON categorias(scope);
+    CREATE INDEX IF NOT EXISTS idx_categorias_tenant_scope ON categorias(tenant_id, scope);
+
     CREATE TABLE IF NOT EXISTS estoque (
       id SERIAL PRIMARY KEY,
       item VARCHAR(255) NOT NULL UNIQUE,
@@ -347,12 +365,22 @@ const discoverCapabilities = async () => {
     ) AS has_investimentos_tenant_id`
   );
 
+  const categoriasTenantResult = await pool.query(
+    `SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'categorias' AND column_name = 'tenant_id'
+    ) AS has_categorias_tenant_id`
+  );
+
   runtimeCapabilities.hasComprasTenantId = comprasTenantResult.rows[0]?.has_compras_tenant_id === true;
   runtimeCapabilities.hasContasTenantId = contasTenantResult.rows[0]?.has_contas_tenant_id === true;
   runtimeCapabilities.hasManutencoesTenantId = manutencoesTenantResult.rows[0]?.has_manutencoes_tenant_id === true;
   runtimeCapabilities.hasEstoqueTenantId = estoqueTenantResult.rows[0]?.has_estoque_tenant_id === true;
   runtimeCapabilities.hasInvestimentosTenantId = runtimeCapabilities.hasUsersTenantId
     && investimentosTenantResult.rows[0]?.has_investimentos_tenant_id === true;
+  runtimeCapabilities.hasCategoriasTenantId = runtimeCapabilities.hasUsersTenantId
+    && categoriasTenantResult.rows[0]?.has_categorias_tenant_id === true;
 };
 
 const hasPasswordChanged = async (plainPassword, passwordHash) => {
@@ -777,6 +805,119 @@ app.delete('/api/compras/:id', authenticateToken, requireTenantScope, requireRol
     res.json({ message: 'Compra excluída com sucesso' });
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/categories', authenticateToken, requireTenantScope, async (req, res) => {
+  try {
+    const normalizedScope = req.query.scope !== undefined
+      ? normalizeCategoryScope(req.query.scope)
+      : null;
+
+    if (req.query.scope !== undefined && !normalizedScope) {
+      return res.status(400).json({ error: `Escopo inválido. Use apenas: ${allowedCategoryScopes.join(', ')}` });
+    }
+
+    const params = [];
+    const where = [];
+
+    if (runtimeCapabilities.hasCategoriasTenantId) {
+      params.push(req.user.tenant_id);
+      where.push(`tenant_id = $${params.length}`);
+    }
+
+    if (normalizedScope) {
+      params.push(normalizedScope);
+      where.push(`scope = $${params.length}`);
+    }
+
+    const whereSql = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
+    const result = await pool.query(
+      `SELECT id, scope, name, tenant_id, created_at
+       FROM categorias
+       ${whereSql}
+       ORDER BY scope ASC, name ASC, id ASC`,
+      params
+    );
+
+    return res.json(result.rows);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/categories', authenticateToken, requireTenantScope, requireRole('admin'), async (req, res) => {
+  const scope = normalizeCategoryScope(req.body?.scope);
+  const name = String(req.body?.name || '').trim();
+
+  if (!scope) {
+    return res.status(400).json({ error: `Escopo inválido. Use apenas: ${allowedCategoryScopes.join(', ')}` });
+  }
+
+  if (!name) {
+    return res.status(400).json({ error: 'Nome da categoria é obrigatório' });
+  }
+
+  const duplicate = runtimeCapabilities.hasCategoriasTenantId
+    ? await pool.query(
+      `SELECT id
+       FROM categorias
+       WHERE tenant_id = $1 AND scope = $2 AND LOWER(name) = LOWER($3)
+       LIMIT 1`,
+      [req.user.tenant_id, scope, name]
+    )
+    : await pool.query(
+      `SELECT id
+       FROM categorias
+       WHERE scope = $1 AND LOWER(name) = LOWER($2)
+       LIMIT 1`,
+      [scope, name]
+    );
+
+  if (duplicate.rows.length > 0) {
+    return res.status(409).json({ error: 'Esta categoria já existe neste escopo' });
+  }
+
+  try {
+    const result = runtimeCapabilities.hasCategoriasTenantId
+      ? await pool.query(
+        `INSERT INTO categorias (tenant_id, scope, name)
+         VALUES ($1, $2, $3)
+         RETURNING id, scope, name, tenant_id, created_at`,
+        [req.user.tenant_id, scope, name]
+      )
+      : await pool.query(
+        `INSERT INTO categorias (scope, name)
+         VALUES ($1, $2)
+         RETURNING id, scope, name, tenant_id, created_at`,
+        [scope, name]
+      );
+
+    return res.status(201).json(result.rows[0]);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/categories/:id', authenticateToken, requireTenantScope, requireRole('admin'), async (req, res) => {
+  try {
+    const result = runtimeCapabilities.hasCategoriasTenantId
+      ? await pool.query(
+        'DELETE FROM categorias WHERE id::text = $1 AND tenant_id = $2 RETURNING id',
+        [req.params.id, req.user.tenant_id]
+      )
+      : await pool.query(
+        'DELETE FROM categorias WHERE id::text = $1 RETURNING id',
+        [req.params.id]
+      );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Categoria não encontrada' });
+    }
+
+    return res.json({ message: 'Categoria excluída com sucesso' });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
   }
 });
 
