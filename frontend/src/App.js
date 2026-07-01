@@ -1995,67 +1995,18 @@ const FinanceApp = () => {
           </aside>
         </section>
 
-        <footer className="relative mt-8 overflow-hidden rounded-[36px] bg-[linear-gradient(135deg,#020617_0%,#0f172a_55%,#123047_100%)] px-6 py-7 text-white shadow-[0_24px_90px_rgba(15,23,42,0.28)] md:px-8">
+        <footer className="relative mt-8 overflow-hidden rounded-[36px] bg-[linear-gradient(135deg,#020617_0%,#0f172a_55%,#123047_100%)] px-6 py-5 text-white shadow-[0_24px_90px_rgba(15,23,42,0.28)] md:px-8">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.16),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(56,189,248,0.12),transparent_26%)]" />
 
-          <div className="relative grid gap-6 xl:grid-cols-[1.15fr_0.95fr]">
-            <div className="rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur">
-              <p className="text-xs font-bold uppercase tracking-[0.32em] text-emerald-300">Finansam Workspace</p>
-              <h3 className="mt-3 max-w-2xl text-3xl font-black tracking-tight text-white">Gestão financeira operacional com leitura executiva e governança por tenant.</h3>
-              <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-300">
-                Uma camada única para registrar lançamentos, organizar categorias reutilizáveis, controlar estoque e sustentar a operação com autenticação, segregação de perfis e visão administrativa centralizada.
-              </p>
-
-              <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-4">
-                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-200">Escopo</p>
-                  <p className="mt-2 text-lg font-black text-white">{isPlatformAdmin ? 'Plataforma' : 'Tenant'}</p>
-                </div>
-                <div className="rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-4">
-                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-sky-200">Sessão</p>
-                  <p className="mt-2 truncate text-lg font-black text-white">{user.name}</p>
-                </div>
-                <div className="rounded-2xl border border-white/10 bg-white/8 px-4 py-4">
-                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-300">Status</p>
-                  <p className="mt-2 text-lg font-black text-emerald-300">Operacional</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr] xl:grid-cols-1">
-              <div className="rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur">
-                <p className="text-sm font-bold uppercase tracking-[0.2em] text-slate-300">Módulos Estratégicos</p>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {['Compras', 'Contas', 'Investimentos', 'Estoque', 'Categorias', 'Relatórios'].map((item) => (
-                    <span key={item} className="rounded-full border border-white/10 bg-white/10 px-3 py-2 text-sm font-semibold text-slate-100">
-                      {item}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              <div className="rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur">
-                <p className="text-sm font-bold uppercase tracking-[0.2em] text-slate-300">Painel Executivo</p>
-                <div className="mt-4 space-y-3 text-sm text-slate-200">
-                  <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-slate-950/30 px-4 py-3">
-                    <span>Usuário ativo</span>
-                    <span className="font-bold text-white">{user.name}</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-slate-950/30 px-4 py-3">
-                    <span>Governança</span>
-                    <span className="font-bold text-white">{isPlatformAdmin ? 'Global' : 'Segmentada'}</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-slate-950/30 px-4 py-3">
-                    <span>Camada de dados</span>
-                    <span className="font-bold text-emerald-300">Centralizada</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="relative mt-6 flex flex-col gap-3 border-t border-white/10 pt-5 text-sm text-slate-400 md:flex-row md:items-center md:justify-between">
-            <p className="font-medium text-slate-300">Powered by SMCorp</p>
+          <div className="relative flex flex-col gap-3 text-sm text-slate-400 md:flex-row md:items-center md:justify-between">
+            <a
+              href="https://smcorp.com.br"
+              target="_blank"
+              rel="noreferrer"
+              className="font-medium text-slate-300 transition hover:text-emerald-300"
+            >
+              Powered By SMCorp
+            </a>
             <p>Finansam {new Date().getFullYear()} • Plataforma administrativa com padrão corporativo</p>
           </div>
         </footer>
