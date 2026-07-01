@@ -26,8 +26,6 @@ const TOKEN_STORAGE_KEY = 'finansam-auth-token';
 const TENANT_VIEW_STORAGE_KEY = 'finansam-platform-tenant-view';
 const MONTHLY_VIEW_STORAGE_KEY = 'finansam-monthly-view';
 const TENANT_PLANS = ['Starter', 'Smart', 'Premium'];
-const DEFAULT_CONTA_CATEGORIES = ['Água', 'Luz', 'Telefone', 'Gás', 'Internet', 'Condomínio', 'Outros'];
-const DEFAULT_INVESTIMENTO_CATEGORIES = ['CDB', 'Tesouro Direto', 'Poupança', 'Fundos', 'Ações', 'Outros'];
 const TENANT_STATUSES = [
   { value: 'active', label: 'Ativo' },
   { value: 'inactive', label: 'Inativo' }
@@ -37,9 +35,9 @@ const defaultMonth = new Date().toISOString().slice(0, 7);
 const defaultDate = new Date().toISOString().slice(0, 10);
 
 const emptyCompra = () => ({ item: '', quantidade: '', valor: '', mes: defaultMonth });
-const emptyConta = () => ({ tipo: DEFAULT_CONTA_CATEGORIES[0], valor: '', mes: defaultMonth });
+const emptyConta = () => ({ tipo: '', valor: '', mes: defaultMonth });
 const emptyManutencao = () => ({ descricao: '', valor: '', data: defaultDate });
-const emptyInvestimento = () => ({ descricao: DEFAULT_INVESTIMENTO_CATEGORIES[0], valor: '', mes: defaultMonth });
+const emptyInvestimento = () => ({ descricao: '', valor: '', mes: defaultMonth });
 const emptyNovoUsuario = () => ({ name: '', email: '', password: '' });
 const emptyCreateTenantForm = () => ({
   firstName: '',
@@ -973,7 +971,7 @@ const FinanceApp = () => {
       .filter((categoria) => categoria.scope === 'contas')
       .map((categoria) => categoria.name);
 
-    return Array.from(new Set([...DEFAULT_CONTA_CATEGORIES, ...custom]));
+    return Array.from(new Set(custom)).sort((a, b) => a.localeCompare(b, 'pt-BR'));
   }, [categorias]);
 
   const categoriasInvestimento = useMemo(() => {
@@ -981,17 +979,27 @@ const FinanceApp = () => {
       .filter((categoria) => categoria.scope === 'investimentos')
       .map((categoria) => categoria.name);
 
-    return Array.from(new Set([...DEFAULT_INVESTIMENTO_CATEGORIES, ...custom]));
+    return Array.from(new Set(custom)).sort((a, b) => a.localeCompare(b, 'pt-BR'));
   }, [categorias]);
 
   useEffect(() => {
-    if (categoriasConta.length > 0 && !categoriasConta.includes(novaConta.tipo)) {
+    if (categoriasConta.length === 0) {
+      setNovaConta((current) => ({ ...current, tipo: '' }));
+      return;
+    }
+
+    if (!categoriasConta.includes(novaConta.tipo)) {
       setNovaConta((current) => ({ ...current, tipo: categoriasConta[0] }));
     }
   }, [categoriasConta, novaConta.tipo]);
 
   useEffect(() => {
-    if (categoriasInvestimento.length > 0 && !categoriasInvestimento.includes(novoInvestimento.descricao)) {
+    if (categoriasInvestimento.length === 0) {
+      setNovoInvestimento((current) => ({ ...current, descricao: '' }));
+      return;
+    }
+
+    if (!categoriasInvestimento.includes(novoInvestimento.descricao)) {
       setNovoInvestimento((current) => ({ ...current, descricao: categoriasInvestimento[0] }));
     }
   }, [categoriasInvestimento, novoInvestimento.descricao]);
@@ -1241,6 +1249,7 @@ const FinanceApp = () => {
                     onChange={(event) => setNovaConta((current) => ({ ...current, tipo: event.target.value }))}
                     className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
                   >
+                    {categoriasConta.length === 0 && <option value="">Cadastre categorias na aba Categorias</option>}
                     {categoriasConta.map((categoria) => (
                       <option key={categoria} value={categoria}>{categoria}</option>
                     ))}
@@ -1303,6 +1312,7 @@ const FinanceApp = () => {
                     onChange={(event) => setNovoInvestimento((current) => ({ ...current, descricao: event.target.value }))}
                     className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
                   >
+                    {categoriasInvestimento.length === 0 && <option value="">Cadastre categorias na aba Categorias</option>}
                     {categoriasInvestimento.map((categoria) => (
                       <option key={categoria} value={categoria}>{categoria}</option>
                     ))}
@@ -1545,7 +1555,7 @@ const FinanceApp = () => {
                         </button>
                       ))}
                       {categorias.filter((categoria) => categoria.scope === 'contas').length === 0 && (
-                        <p className="text-sm text-slate-500">Nenhuma categoria personalizada cadastrada.</p>
+                        <p className="text-sm text-slate-500">Nenhuma categoria cadastrada.</p>
                       )}
                     </div>
                   </div>
@@ -1568,7 +1578,7 @@ const FinanceApp = () => {
                         </button>
                       ))}
                       {categorias.filter((categoria) => categoria.scope === 'investimentos').length === 0 && (
-                        <p className="text-sm text-slate-500">Nenhuma categoria personalizada cadastrada.</p>
+                        <p className="text-sm text-slate-500">Nenhuma categoria cadastrada.</p>
                       )}
                     </div>
                   </div>
