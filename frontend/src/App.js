@@ -5,6 +5,7 @@ import {
   Building2,
   CheckCircle2,
   DollarSign,
+  Gamepad2,
   Landmark,
   LogIn,
   LogOut,
@@ -36,6 +37,7 @@ const defaultDate = new Date().toISOString().slice(0, 10);
 
 const emptyCompra = () => ({ item: '', quantidade: '', valor: '', mes: defaultMonth });
 const emptyConta = () => ({ tipo: '', valor: '', mes: defaultMonth });
+const emptyLazer = () => ({ descricao: '', valor: '', mes: defaultMonth });
 const emptyManutencao = () => ({ descricao: '', valor: '', data: defaultDate });
 const emptyInvestimento = () => ({ descricao: '', valor: '', mes: defaultMonth, nota: '' });
 const emptyNovoUsuario = () => ({ name: '', email: '', password: '' });
@@ -149,6 +151,7 @@ const readMonthlyViewPreferences = () => {
         reportMonth: defaultMonth,
         comprasMonth: defaultMonth,
         contasMonth: defaultMonth,
+        lazerMonth: defaultMonth,
         manutencoesMonth: defaultMonth,
         investimentosMonth: defaultMonth
       };
@@ -160,6 +163,7 @@ const readMonthlyViewPreferences = () => {
       reportMonth: isMonthValueValid(parsed?.reportMonth) ? parsed.reportMonth : defaultMonth,
       comprasMonth: isMonthValueValid(parsed?.comprasMonth) ? parsed.comprasMonth : defaultMonth,
       contasMonth: isMonthValueValid(parsed?.contasMonth) ? parsed.contasMonth : defaultMonth,
+      lazerMonth: isMonthValueValid(parsed?.lazerMonth) ? parsed.lazerMonth : defaultMonth,
       manutencoesMonth: isMonthValueValid(parsed?.manutencoesMonth) ? parsed.manutencoesMonth : defaultMonth,
       investimentosMonth: isMonthValueValid(parsed?.investimentosMonth) ? parsed.investimentosMonth : defaultMonth
     };
@@ -168,6 +172,7 @@ const readMonthlyViewPreferences = () => {
       reportMonth: defaultMonth,
       comprasMonth: defaultMonth,
       contasMonth: defaultMonth,
+      lazerMonth: defaultMonth,
       manutencoesMonth: defaultMonth,
       investimentosMonth: defaultMonth
     };
@@ -182,6 +187,7 @@ const currencyFormatter = new Intl.NumberFormat('pt-BR', {
 const tabs = [
   { key: 'compras', label: 'Compras do Mês', icon: ShoppingCart },
   { key: 'contas', label: 'Contas Fixas', icon: DollarSign },
+  { key: 'lazer', label: 'Lazer', icon: Gamepad2 },
   { key: 'investimentos', label: 'Investimentos', icon: Landmark },
   { key: 'manutencoes', label: 'Extraordinárias', icon: Wrench },
   { key: 'estoque', label: 'Estoque', icon: Package },
@@ -334,6 +340,7 @@ const FinanceApp = () => {
   const [activeTab, setActiveTab] = useState('compras');
   const [compras, setCompras] = useState([]);
   const [contas, setContas] = useState([]);
+  const [lazer, setLazer] = useState([]);
   const [categorias, setCategorias] = useState([]);
   const [investimentos, setInvestimentos] = useState([]);
   const [manutencoes, setManutencoes] = useState([]);
@@ -349,6 +356,7 @@ const FinanceApp = () => {
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   const [novaCompra, setNovaCompra] = useState(emptyCompra());
   const [novaConta, setNovaConta] = useState(emptyConta());
+  const [novoLazer, setNovoLazer] = useState(emptyLazer());
   const [novoInvestimento, setNovoInvestimento] = useState(emptyInvestimento());
   const [novaManutencao, setNovaManutencao] = useState(emptyManutencao());
   const [novoUsuario, setNovoUsuario] = useState(emptyNovoUsuario());
@@ -366,6 +374,7 @@ const FinanceApp = () => {
   const [mesRelatorio, setMesRelatorio] = useState(monthlyViewPreferences.reportMonth);
   const [mesFiltroCompras, setMesFiltroCompras] = useState(monthlyViewPreferences.comprasMonth);
   const [mesFiltroContas, setMesFiltroContas] = useState(monthlyViewPreferences.contasMonth);
+  const [mesFiltroLazer, setMesFiltroLazer] = useState(monthlyViewPreferences.lazerMonth);
   const [mesFiltroManutencoes, setMesFiltroManutencoes] = useState(monthlyViewPreferences.manutencoesMonth);
   const [mesFiltroInvestimentos, setMesFiltroInvestimentos] = useState(monthlyViewPreferences.investimentosMonth);
   const [baixasEstoque, setBaixasEstoque] = useState({});
@@ -427,6 +436,7 @@ const FinanceApp = () => {
       setPlatformAdmins(adminsData);
       setCompras([]);
       setContas([]);
+      setLazer([]);
       setCategorias([]);
       setInvestimentos([]);
       setManutencoes([]);
@@ -439,6 +449,7 @@ const FinanceApp = () => {
     const requests = [
       apiFetch('/compras', { authToken }),
       apiFetch('/contas', { authToken }),
+      apiFetch('/lazer', { authToken }),
       apiFetch('/categories', { authToken }),
       apiFetch('/investimentos', { authToken }),
       apiFetch('/manutencoes', { authToken }),
@@ -449,10 +460,11 @@ const FinanceApp = () => {
       requests.push(apiFetch('/users', { authToken }));
     }
 
-    const [comprasData, contasData, categoriasData, investimentosData, manutencoesData, estoqueData, usersData] = await Promise.all(requests);
+    const [comprasData, contasData, lazerData, categoriasData, investimentosData, manutencoesData, estoqueData, usersData] = await Promise.all(requests);
 
     setCompras(comprasData);
     setContas(contasData);
+    setLazer(lazerData);
     setCategorias(categoriasData);
     setInvestimentos(investimentosData);
     setManutencoes(manutencoesData);
@@ -510,11 +522,12 @@ const FinanceApp = () => {
         reportMonth: mesRelatorio,
         comprasMonth: mesFiltroCompras,
         contasMonth: mesFiltroContas,
+        lazerMonth: mesFiltroLazer,
         manutencoesMonth: mesFiltroManutencoes,
         investimentosMonth: mesFiltroInvestimentos
       })
     );
-  }, [mesRelatorio, mesFiltroCompras, mesFiltroContas, mesFiltroManutencoes, mesFiltroInvestimentos]);
+  }, [mesRelatorio, mesFiltroCompras, mesFiltroContas, mesFiltroLazer, mesFiltroManutencoes, mesFiltroInvestimentos]);
 
   const handleLogout = () => {
     localStorage.removeItem(TOKEN_STORAGE_KEY);
@@ -522,6 +535,7 @@ const FinanceApp = () => {
     setUser(null);
     setCompras([]);
     setContas([]);
+    setLazer([]);
     setCategorias([]);
     setInvestimentos([]);
     setManutencoes([]);
@@ -601,6 +615,21 @@ const FinanceApp = () => {
       });
       setNovaConta(emptyConta());
     }, 'Conta adicionada com sucesso');
+  };
+
+  const adicionarLazer = async () => {
+    if (!novoLazer.descricao || !novoLazer.valor || !novoLazer.mes) {
+      setErrorMessage('Preencha todos os campos de lazer');
+      return;
+    }
+
+    await runMutation(async () => {
+      await apiFetch('/lazer', {
+        method: 'POST',
+        body: JSON.stringify(novoLazer)
+      });
+      setNovoLazer(emptyLazer());
+    }, 'Despesa de lazer adicionada com sucesso');
   };
 
   const adicionarManutencao = async () => {
@@ -896,14 +925,16 @@ const FinanceApp = () => {
   const relatorio = useMemo(() => {
     const comprasMes = compras.filter((compra) => compra.mes === mesRelatorio);
     const contasMes = contas.filter((conta) => conta.mes === mesRelatorio);
+    const lazerMes = lazer.filter((item) => item.mes === mesRelatorio);
     const investimentosMes = investimentos.filter((investimento) => investimento.mes === mesRelatorio);
     const manutencoesMes = manutencoes.filter((manutencao) => manutencao.data.slice(0, 7) === mesRelatorio);
 
     const totalCompras = comprasMes.reduce((acc, compra) => acc + Number(compra.valor), 0);
     const totalContas = contasMes.reduce((acc, conta) => acc + Number(conta.valor), 0);
+    const totalLazer = lazerMes.reduce((acc, item) => acc + Number(item.valor), 0);
     const totalInvestimentos = investimentosMes.reduce((acc, investimento) => acc + Number(investimento.valor), 0);
     const totalManutencoes = manutencoesMes.reduce((acc, manutencao) => acc + Number(manutencao.valor), 0);
-    const totalGeral = totalCompras + totalContas + totalInvestimentos + totalManutencoes;
+    const totalGeral = totalCompras + totalContas + totalLazer + totalInvestimentos + totalManutencoes;
 
     const contasPorTipo = contasMes.reduce((acc, conta) => {
       acc[conta.tipo] = (acc[conta.tipo] || 0) + Number(conta.valor);
@@ -913,16 +944,18 @@ const FinanceApp = () => {
     return {
       comprasMes,
       contasMes,
+      lazerMes,
       investimentosMes,
       manutencoesMes,
       contasPorTipo,
       totalCompras,
       totalContas,
+      totalLazer,
       totalInvestimentos,
       totalManutencoes,
       totalGeral
     };
-  }, [compras, contas, investimentos, manutencoes, mesRelatorio]);
+  }, [compras, contas, lazer, investimentos, manutencoes, mesRelatorio]);
 
   const tenantPlanOptions = useMemo(() => {
     const options = Array.from(new Set(
@@ -1048,6 +1081,7 @@ const FinanceApp = () => {
   const distributionItems = [
     { label: 'Compras', total: relatorio.totalCompras, className: 'bg-blue-500' },
     { label: 'Contas', total: relatorio.totalContas, className: 'bg-emerald-500' },
+    { label: 'Lazer', total: relatorio.totalLazer, className: 'bg-fuchsia-500' },
     { label: 'Investimentos', total: relatorio.totalInvestimentos, className: 'bg-indigo-500' },
     { label: 'Manutenções', total: relatorio.totalManutencoes, className: 'bg-amber-500' }
   ];
@@ -1317,6 +1351,33 @@ const FinanceApp = () => {
               </div>
             )}
 
+            {activeTab === 'lazer' && (
+              <div>
+                <SectionHeader title="Despesas de Lazer" description="Controle mensal dos gastos com lazer e entretenimento." />
+                <div className="mt-6 grid gap-4 md:grid-cols-4">
+                  <Field value={novoLazer.descricao} onChange={(value) => setNovoLazer((current) => ({ ...current, descricao: value }))} placeholder="Descrição" />
+                  <Field type="number" value={novoLazer.valor} onChange={(value) => setNovoLazer((current) => ({ ...current, valor: value }))} placeholder="Valor" />
+                  <Field type="month" value={novoLazer.mes} onChange={(value) => setNovoLazer((current) => ({ ...current, mes: value }))} />
+                  <PrimaryButton icon={PlusCircle} onClick={adicionarLazer} disabled={loading} label="Adicionar" />
+                </div>
+                <FilterMonth value={mesFiltroLazer} onChange={setMesFiltroLazer} />
+                <DataTable
+                  headers={['Descrição', 'Valor', 'Mês', 'Ações']}
+                  rows={lazer.filter((item) => item.mes === mesFiltroLazer).map((item) => [
+                    item.descricao,
+                    formatCurrency(item.valor),
+                    item.mes,
+                    isAdmin ? (
+                      <DangerTextButton key={`delete-lazer-${item.id}`} onClick={() => excluirRegistro(`/lazer/${item.id}`, 'Despesa de lazer excluída com sucesso')} label="Excluir" />
+                    ) : (
+                      <span key={`readonly-lazer-${item.id}`} className="text-sm text-slate-400">Somente admin exclui</span>
+                    )
+                  ])}
+                  emptyMessage="Nenhuma despesa de lazer registrada para este mês"
+                />
+              </div>
+            )}
+
             {activeTab === 'manutencoes' && (
               <div>
                 <SectionHeader title="Extraordinárias" description="Custos ocasionais separados das contas fixas." />
@@ -1423,6 +1484,7 @@ const FinanceApp = () => {
                 <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                   <MetricCard title="Compras" value={formatCurrency(relatorio.totalCompras)} tone="bg-blue-100 text-blue-900" />
                   <MetricCard title="Contas" value={formatCurrency(relatorio.totalContas)} tone="bg-emerald-100 text-emerald-900" />
+                  <MetricCard title="Lazer" value={formatCurrency(relatorio.totalLazer)} tone="bg-fuchsia-100 text-fuchsia-900" />
                   <MetricCard title="Investimentos" value={formatCurrency(relatorio.totalInvestimentos)} tone="bg-indigo-100 text-indigo-900" />
                   <MetricCard title="Manutenções" value={formatCurrency(relatorio.totalManutencoes)} tone="bg-amber-100 text-amber-900" />
                   <MetricCard title="Total Geral" value={formatCurrency(relatorio.totalGeral)} tone="bg-rose-100 text-rose-900" />

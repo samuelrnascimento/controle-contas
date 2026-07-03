@@ -28,6 +28,7 @@ const runtimeCapabilities = {
   hasUsersTenantId: false,
   hasComprasTenantId: false,
   hasContasTenantId: false,
+  hasLazerTenantId: false,
   hasManutencoesTenantId: false,
   hasEstoqueTenantId: false,
   hasInvestimentosTenantId: false,
@@ -248,6 +249,17 @@ const ensureSchema = async () => {
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
+    CREATE TABLE IF NOT EXISTS lazer (
+      id SERIAL PRIMARY KEY,
+      descricao TEXT NOT NULL,
+      valor DECIMAL(10, 2) NOT NULL,
+      mes VARCHAR(7) NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    ALTER TABLE lazer ADD COLUMN IF NOT EXISTS tenant_id TEXT;
+    ALTER TABLE lazer ALTER COLUMN tenant_id TYPE TEXT USING tenant_id::text;
+
     CREATE TABLE IF NOT EXISTS manutencoes (
       id SERIAL PRIMARY KEY,
       descricao TEXT NOT NULL,
@@ -288,6 +300,7 @@ const ensureSchema = async () => {
 
     CREATE INDEX IF NOT EXISTS idx_compras_mes ON compras(mes);
     CREATE INDEX IF NOT EXISTS idx_contas_mes ON contas(mes);
+    CREATE INDEX IF NOT EXISTS idx_lazer_mes ON lazer(mes);
     CREATE INDEX IF NOT EXISTS idx_manutencoes_data ON manutencoes(data);
     CREATE INDEX IF NOT EXISTS idx_investimentos_mes ON investimentos(mes);
     CREATE INDEX IF NOT EXISTS idx_estoque_item ON estoque(item);
@@ -350,6 +363,14 @@ const discoverCapabilities = async () => {
     ) AS has_manutencoes_tenant_id`
   );
 
+  const lazerTenantResult = await pool.query(
+    `SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'lazer' AND column_name = 'tenant_id'
+    ) AS has_lazer_tenant_id`
+  );
+
   const estoqueTenantResult = await pool.query(
     `SELECT EXISTS (
       SELECT 1
@@ -376,6 +397,8 @@ const discoverCapabilities = async () => {
 
   runtimeCapabilities.hasComprasTenantId = comprasTenantResult.rows[0]?.has_compras_tenant_id === true;
   runtimeCapabilities.hasContasTenantId = contasTenantResult.rows[0]?.has_contas_tenant_id === true;
+  runtimeCapabilities.hasLazerTenantId = runtimeCapabilities.hasUsersTenantId
+    && lazerTenantResult.rows[0]?.has_lazer_tenant_id === true;
   runtimeCapabilities.hasManutencoesTenantId = manutencoesTenantResult.rows[0]?.has_manutencoes_tenant_id === true;
   runtimeCapabilities.hasEstoqueTenantId = estoqueTenantResult.rows[0]?.has_estoque_tenant_id === true;
   runtimeCapabilities.hasInvestimentosTenantId = runtimeCapabilities.hasUsersTenantId
@@ -968,6 +991,57 @@ app.delete('/api/contas/:id', authenticateToken, requireTenantScope, requireRole
     }
 
     res.json({ message: 'Conta excluída com sucesso' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/lazer', authenticateToken, requireTenantScope, async (req, res) => {
+  try {
+    const result = runtimeCapabilities.hasLazerTenantId
+      ? await pool.query('SELECT * FROM lazer WHERE tenant_id = $1 ORDER BY mes DESC, id DESC', [req.user.tenant_id])
+      : await pool.query('SELECT * FROM lazer ORDER BY mes DESC, id DESC');
+
+    res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/lazer', authenticateToken, requireTenantScope, async (req, res) => {
+  const { descricao, valor, mes } = req.body;
+  const valorNumerico = parseAmount(valor);
+
+  if (!descricao || !mes || valorNumerico === null) {
+    return res.status(400).json({ error: 'Dados de despesa de lazer inválidos' });
+  }
+
+  try {
+    const result = runtimeCapabilities.hasLazerTenantId
+      ? await pool.query(
+        'INSERT INTO lazer (tenant_id, descricao, valor, mes) VALUES ($1, $2, $3, $4) RETURNING *',
+        [req.user.tenant_id, descricao, valorNumerico, mes]
+      )
+      : await pool.query(
+        'INSERT INTO lazer (descricao, valor, mes) VALUES ($1, $2, $3) RETURNING *',
+        [descricao, valorNumerico, mes]
+      );
+
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/lazer/:id', authenticateToken, requireTenantScope, requireRole('admin'), async (req, res) => {
+  try {
+    if (runtimeCapabilities.hasLazerTenantId) {
+      await pool.query('DELETE FROM lazer WHERE id::text = $1 AND tenant_id = $2', [req.params.id, req.user.tenant_id]);
+    } else {
+      await pool.query('DELETE FROM lazer WHERE id::text = $1', [req.params.id]);
+    }
+
+    res.json({ message: 'Despesa de lazer excluída com sucesso' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

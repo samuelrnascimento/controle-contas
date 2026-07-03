@@ -42,6 +42,15 @@ CREATE TABLE IF NOT EXISTS contas (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Tabela de despesas de lazer
+CREATE TABLE IF NOT EXISTS lazer (
+    id SERIAL PRIMARY KEY,
+    descricao TEXT NOT NULL,
+    valor DECIMAL(10, 2) NOT NULL,
+    mes VARCHAR(7) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Tabela de manutenções
 CREATE TABLE IF NOT EXISTS manutencoes (
     id SERIAL PRIMARY KEY,
@@ -63,6 +72,7 @@ CREATE TABLE IF NOT EXISTS estoque (
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
 CREATE INDEX IF NOT EXISTS idx_compras_mes ON compras(mes);
 CREATE INDEX IF NOT EXISTS idx_contas_mes ON contas(mes);
+CREATE INDEX IF NOT EXISTS idx_lazer_mes ON lazer(mes);
 CREATE INDEX IF NOT EXISTS idx_manutencoes_data ON manutencoes(data);
 CREATE INDEX IF NOT EXISTS idx_estoque_item ON estoque(item);
 
