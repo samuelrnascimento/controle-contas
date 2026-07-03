@@ -29,6 +29,7 @@ const MONTHLY_VIEW_STORAGE_KEY = 'finansam-monthly-view';
 const TENANT_PLANS = ['Starter', 'Smart', 'Premium'];
 const TENANT_STATUSES = [
   { value: 'active', label: 'Ativo' },
+  { value: 'trial', label: 'Trial' },
   { value: 'inactive', label: 'Inativo' }
 ];
 
@@ -62,6 +63,16 @@ const emptyEditTenantForm = () => ({
   phone: '',
   email: '',
   createAdminUser: false,
+  adminEmail: '',
+  adminPassword: ''
+});
+const emptyPublicSignupForm = () => ({
+  firstName: '',
+  lastName: '',
+  company: '',
+  plan: 'Starter',
+  phone: '',
+  email: '',
   adminEmail: '',
   adminPassword: ''
 });
@@ -101,6 +112,10 @@ const normalizeTenantStatus = (value) => {
 
   if (normalized === 'inactive' || normalized === 'inativo') {
     return 'inactive';
+  }
+
+  if (normalized === 'trial' || normalized === 'teste') {
+    return 'trial';
   }
 
   return null;
@@ -375,6 +390,8 @@ const FinanceApp = () => {
   const [novaCategoriaInvestimento, setNovaCategoriaInvestimento] = useState('');
   const [showCreateTenantForm, setShowCreateTenantForm] = useState(false);
   const [createTenantForm, setCreateTenantForm] = useState(emptyCreateTenantForm());
+  const [showPublicSignupForm, setShowPublicSignupForm] = useState(false);
+  const [publicSignupForm, setPublicSignupForm] = useState(emptyPublicSignupForm());
   const [editTenantForm, setEditTenantForm] = useState(emptyEditTenantForm());
   const [editingTenantId, setEditingTenantId] = useState(null);
   const [tenantPlanFilter, setTenantPlanFilter] = useState(tenantViewPreferences.planFilter);
@@ -576,6 +593,33 @@ const FinanceApp = () => {
       await loadProtectedData(data.user, data.token);
       setLoginForm({ email: '', password: '' });
       setSuccessMessage(`Sessão iniciada como ${data.user.name}`);
+    } catch (error) {
+      setErrorMessage(normalizeError(error));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePublicSignup = async (event) => {
+    event.preventDefault();
+    clearMessages();
+    setLoading(true);
+
+    try {
+      const data = await apiFetch('/auth/signup', {
+        method: 'POST',
+        authToken: '',
+        body: JSON.stringify(publicSignupForm)
+      });
+
+      localStorage.setItem(TOKEN_STORAGE_KEY, data.token);
+      setToken(data.token);
+      setUser(data.user);
+      setActiveTab('compras');
+      await loadProtectedData(data.user, data.token);
+      setPublicSignupForm(emptyPublicSignupForm());
+      setShowPublicSignupForm(false);
+      setSuccessMessage('Cadastro criado com trial de 7 dias');
     } catch (error) {
       setErrorMessage(normalizeError(error));
     } finally {
@@ -1286,6 +1330,110 @@ const FinanceApp = () => {
                 <LogIn size={18} /> {loading ? 'Entrando...' : 'Iniciar sessão'}
               </button>
             </form>
+
+            <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3">
+              <div>
+                <p className="text-sm font-semibold text-slate-800">Novo por aqui?</p>
+                <p className="text-xs text-slate-500">Crie seu tenant com trial de 7 dias.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPublicSignupForm((current) => !current)}
+                className="rounded-2xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-800 transition hover:border-slate-400 hover:bg-slate-50"
+              >
+                {showPublicSignupForm ? 'Fechar' : 'Criar cadastro'}
+              </button>
+            </div>
+
+            {showPublicSignupForm && (
+              <form className="mt-5 space-y-4 rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_14px_35px_rgba(15,23,42,0.08)]" onSubmit={handlePublicSignup}>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">Cadastro com trial</h3>
+                  <p className="text-sm text-slate-600">Seu tenant nasce ativo por 7 dias. Após isso, a assinatura precisa ser renovada.</p>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-semibold text-slate-700">Nome</span>
+                    <input
+                      type="text"
+                      value={publicSignupForm.firstName}
+                      onChange={(event) => setPublicSignupForm((current) => ({ ...current, firstName: event.target.value }))}
+                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-200"
+                      placeholder="Seu nome"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-semibold text-slate-700">Sobrenome</span>
+                    <input
+                      type="text"
+                      value={publicSignupForm.lastName}
+                      onChange={(event) => setPublicSignupForm((current) => ({ ...current, lastName: event.target.value }))}
+                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-200"
+                      placeholder="Seu sobrenome"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-semibold text-slate-700">Empresa</span>
+                    <input
+                      type="text"
+                      value={publicSignupForm.company}
+                      onChange={(event) => setPublicSignupForm((current) => ({ ...current, company: event.target.value }))}
+                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-200"
+                      placeholder="Nome da empresa"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-semibold text-slate-700">Plano</span>
+                    <select
+                      value={publicSignupForm.plan}
+                      onChange={(event) => setPublicSignupForm((current) => ({ ...current, plan: event.target.value }))}
+                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-200"
+                    >
+                      {TENANT_PLANS.map((plan) => (
+                        <option key={plan} value={plan}>{plan}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-semibold text-slate-700">Telefone</span>
+                    <input
+                      type="text"
+                      value={publicSignupForm.phone}
+                      onChange={(event) => setPublicSignupForm((current) => ({ ...current, phone: event.target.value }))}
+                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-200"
+                      placeholder="(00) 00000-0000"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-semibold text-slate-700">E-mail</span>
+                    <input
+                      type="email"
+                      value={publicSignupForm.email}
+                      onChange={(event) => setPublicSignupForm((current) => ({ ...current, email: event.target.value }))}
+                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-200"
+                      placeholder="contato@empresa.com"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-semibold text-slate-700">Senha do admin</span>
+                    <input
+                      type="password"
+                      value={publicSignupForm.adminPassword}
+                      onChange={(event) => setPublicSignupForm((current) => ({ ...current, adminPassword: event.target.value }))}
+                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-200"
+                      placeholder="Mínimo de 6 caracteres"
+                    />
+                  </label>
+                </div>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <UserPlus size={18} /> {loading ? 'Criando...' : 'Criar cadastro'}
+                </button>
+              </form>
+            )}
 
             {errorMessage && (
               <div className="mt-4 flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-rose-700">

@@ -36,7 +36,7 @@ const runtimeCapabilities = {
 };
 
 const allowedTenantPlans = ['Starter', 'Smart', 'Premium'];
-const allowedTenantStatuses = ['active', 'inactive'];
+const allowedTenantStatuses = ['active', 'inactive', 'trial'];
 const allowedCategoryScopes = ['contas', 'investimentos'];
 
 const normalizeTenantPlan = (value) => {
@@ -68,7 +68,21 @@ const normalizeTenantStatus = (value) => {
     return 'inactive';
   }
 
+  if (normalized === 'trial' || normalized === 'teste') {
+    return 'trial';
+  }
+
   return null;
+};
+
+const addDays = (days) => new Date(Date.now() + (days * 24 * 60 * 60 * 1000));
+
+const isTrialExpired = (tenant) => {
+  if (!tenant || tenant.subscription_status !== 'trial' || !tenant.trial_expires_at) {
+    return false;
+  }
+
+  return new Date(tenant.trial_expires_at).getTime() <= Date.now();
 };
 
 const applyTenantUserStatus = async (db, tenantId, status) => {
@@ -81,7 +95,7 @@ const applyTenantUserStatus = async (db, tenantId, status) => {
     return;
   }
 
-  if (status === 'active') {
+  if (status === 'active' || status === 'trial') {
     await db.query(
       `UPDATE users
        SET active = true
@@ -170,13 +184,31 @@ const authenticateToken = async (req, res, next) => {
       return next();
     }
 
-    const result = await pool.query(
-      'SELECT * FROM users WHERE id::text = $1',
-      [payload.sub]
-    );
+    const result = runtimeCapabilities.hasTenantsTable
+      ? await pool.query(
+        `SELECT u.*, t.name AS tenant_name, t.slug AS tenant_slug, t.plan AS tenant_plan,
+                t.subscription_status, t.trial_expires_at
+         FROM users u
+         LEFT JOIN tenants t ON t.id = u.tenant_id
+         WHERE u.id::text = $1`,
+        [payload.sub]
+      )
+      : await pool.query('SELECT * FROM users WHERE id::text = $1', [payload.sub]);
 
     if (result.rows.length === 0 || !isUserActive(result.rows[0])) {
       return res.status(401).json({ error: 'Usuário inválido ou inativo' });
+    }
+
+    if (runtimeCapabilities.hasTenantsTable) {
+      const tenant = result.rows[0];
+
+      if (tenant.subscription_status === 'inactive') {
+        return res.status(401).json({ error: 'Tenant inativo' });
+      }
+
+      if (isTrialExpired(tenant)) {
+        return res.status(401).json({ error: 'Seu trial expirou. Entre em contato para renovar.' });
+      }
     }
 
     req.authScope = 'tenant';
@@ -316,6 +348,20 @@ const ensureSchema = async () => {
     );
 
     CREATE INDEX IF NOT EXISTS idx_platform_users_email ON platform_users(email);
+  `);
+};
+
+const ensureTenantSchema = async () => {
+  if (!runtimeCapabilities.hasTenantsTable) {
+    return;
+  }
+
+  await pool.query(`
+    ALTER TABLE tenants ADD COLUMN IF NOT EXISTS trial_expires_at TIMESTAMP;
+
+    UPDATE tenants
+    SET trial_expires_at = COALESCE(trial_expires_at, created_at + INTERVAL '7 days')
+    WHERE subscription_status = 'trial' AND trial_expires_at IS NULL;
   `);
 };
 
@@ -603,10 +649,20 @@ app.post('/api/auth/login', async (req, res) => {
       return res.json({ token: createPlatformToken(platformUser), user: sanitizePlatformUser(platformUser) });
     }
 
-    const result = await pool.query(
-      'SELECT * FROM users WHERE email = $1 LIMIT 1',
-      [email]
-    );
+    const result = runtimeCapabilities.hasTenantsTable
+      ? await pool.query(
+        `SELECT u.*, t.name AS tenant_name, t.slug AS tenant_slug, t.plan AS tenant_plan,
+                t.subscription_status, t.trial_expires_at
+         FROM users u
+         LEFT JOIN tenants t ON t.id = u.tenant_id
+         WHERE u.email = $1
+         LIMIT 1`,
+        [email]
+      )
+      : await pool.query(
+        'SELECT * FROM users WHERE email = $1 LIMIT 1',
+        [email]
+      );
 
     if (result.rows.length === 0) {
       return res.status(401).json({ error: 'Credenciais inválidas' });
@@ -619,9 +675,95 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(401).json({ error: 'Credenciais inválidas' });
     }
 
+    if (runtimeCapabilities.hasTenantsTable) {
+      if (user.subscription_status === 'inactive') {
+        return res.status(401).json({ error: 'Tenant inativo' });
+      }
+
+      if (isTrialExpired(user)) {
+        return res.status(401).json({ error: 'Seu trial expirou. Entre em contato para renovar.' });
+      }
+    }
+
     res.json({ token: createTenantToken(user), user: sanitizeUser(user) });
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/auth/signup', async (req, res) => {
+  if (!runtimeCapabilities.hasTenantsTable || !runtimeCapabilities.hasUsersTenantId) {
+    return res.status(400).json({ error: 'Cadastro público indisponível neste ambiente' });
+  }
+
+  const firstName = String(req.body?.firstName || '').trim();
+  const lastName = String(req.body?.lastName || '').trim();
+  const company = String(req.body?.company || '').trim();
+  const plan = normalizeTenantPlan(req.body?.plan || 'Starter');
+  const phone = String(req.body?.phone || '').trim();
+  const email = String(req.body?.email || '').trim().toLowerCase();
+  const adminEmail = String(req.body?.adminEmail || email || '').trim().toLowerCase();
+  const adminPassword = String(req.body?.adminPassword || '').trim();
+  const ownerName = `${firstName} ${lastName}`.trim();
+  const tenantName = company || ownerName;
+  const tenantSlug = normalizeTenantSlug(company || ownerName || email.split('@')[0]);
+
+  if (!firstName || !plan || !phone || !email || !adminEmail || !adminPassword) {
+    return res.status(400).json({ error: 'Preencha nome, plano, telefone, e-mail e credenciais do admin' });
+  }
+
+  if (!tenantName || !tenantSlug) {
+    return res.status(400).json({ error: 'Não foi possível gerar os dados do tenant. Revise os campos informados.' });
+  }
+
+  if (adminPassword.length < 6) {
+    return res.status(400).json({ error: 'A senha do usuário admin deve ter ao menos 6 caracteres' });
+  }
+
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    const tenantResult = await client.query(
+      `INSERT INTO tenants (name, slug, plan, subscription_status, trial_expires_at)
+       VALUES ($1, $2, $3, 'trial', $4)
+       RETURNING id, name, slug, plan, subscription_status, trial_expires_at, created_at`,
+      [tenantName, tenantSlug, plan, addDays(7)]
+    );
+
+    const tenant = tenantResult.rows[0];
+    const passwordHash = await bcrypt.hash(adminPassword, 10);
+    const adminResult = await client.query(
+      `INSERT INTO users (tenant_id, name, email, password_hash, role, active)
+       VALUES ($1, $2, $3, $4, 'admin', true)
+       RETURNING *`,
+      [tenant.id, ownerName || firstName, adminEmail, passwordHash]
+    );
+
+    await applyTenantUserStatus(client, tenant.id, 'trial');
+    await client.query('COMMIT');
+
+    const createdAdmin = adminResult.rows[0];
+    return res.status(201).json({
+      token: createTenantToken(createdAdmin),
+      user: sanitizeUser(createdAdmin),
+      tenant
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+
+    if (error.code === '23505') {
+      if (String(error.constraint || '').includes('users')) {
+        return res.status(409).json({ error: 'Já existe usuário com este e-mail' });
+      }
+
+      return res.status(409).json({ error: 'Já existe tenant com este slug' });
+    }
+
+    return res.status(500).json({ error: error.message });
+  } finally {
+    client.release();
   }
 });
 
@@ -1573,16 +1715,18 @@ app.post('/api/platform/tenants', authenticateToken, requirePlatformAdmin, async
     return res.status(400).json({ error: 'A senha do usuário admin deve ter ao menos 6 caracteres' });
   }
 
+  const trialExpiresAt = subscriptionStatus === 'trial' ? addDays(7) : null;
+
   const client = await pool.connect();
 
   try {
     await client.query('BEGIN');
 
     const result = await client.query(
-      `INSERT INTO tenants (name, slug, plan, subscription_status)
-       VALUES ($1, $2, $3, $4)
-       RETURNING id, name, slug, plan, subscription_status, created_at`,
-      [name, slug, plan, subscriptionStatus]
+      `INSERT INTO tenants (name, slug, plan, subscription_status, trial_expires_at)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, name, slug, plan, subscription_status, trial_expires_at, created_at`,
+      [name, slug, plan, subscriptionStatus, trialExpiresAt]
     );
 
     const tenant = result.rows[0];
@@ -1593,7 +1737,7 @@ app.post('/api/platform/tenants', authenticateToken, requirePlatformAdmin, async
       await client.query(
         `INSERT INTO users (tenant_id, name, email, password_hash, role, active)
          VALUES ($1, $2, $3, $4, 'admin', $5)`,
-        [tenant.id, adminName, adminEmail, passwordHash, subscriptionStatus === 'active']
+        [tenant.id, adminName, adminEmail, passwordHash, subscriptionStatus !== 'inactive']
       );
     }
 
@@ -1675,6 +1819,12 @@ app.patch('/api/platform/tenants/:id', authenticateToken, requirePlatformAdmin, 
     return res.status(400).json({ error: 'A senha do usuário admin deve ter ao menos 6 caracteres' });
   }
 
+  const nextTrialExpiresAt = nextStatus === 'trial'
+    ? addDays(7)
+    : req.body?.subscriptionStatus !== undefined
+      ? null
+      : undefined;
+
   if (nextName === null && nextSlug === null && nextPlan === null && nextStatus === null && !createAdminUser) {
     return res.status(400).json({ error: 'Informe ao menos um campo para atualização' });
   }
@@ -1704,10 +1854,15 @@ app.patch('/api/platform/tenants/:id', authenticateToken, requirePlatformAdmin, 
        SET name = COALESCE($1, name),
            slug = COALESCE($2, slug),
            plan = COALESCE($3, plan),
-           subscription_status = COALESCE($4, subscription_status)
+           subscription_status = COALESCE($4, subscription_status),
+           trial_expires_at = CASE
+             WHEN $4 IS NULL THEN trial_expires_at
+             WHEN $4 = 'trial' THEN COALESCE(trial_expires_at, $6)
+             ELSE NULL
+           END
        WHERE id::text = $5
-       RETURNING id, name, slug, plan, subscription_status, created_at`,
-      [nextName, nextSlug, nextPlan, nextStatus, targetId]
+       RETURNING id, name, slug, plan, subscription_status, trial_expires_at, created_at`,
+      [nextName, nextSlug, nextPlan, nextStatus, targetId, nextTrialExpiresAt]
     );
 
     const tenant = result.rows[0];
@@ -1914,6 +2069,7 @@ const startServer = async () => {
   try {
     await ensureSchema();
     await discoverCapabilities();
+    await ensureTenantSchema();
     await ensureAdminUser();
     await ensurePlatformAdminUser();
 
