@@ -11,10 +11,10 @@ jobs:
     strategy:
       matrix:
         include:
-          - image_name: controle-contas-backend
+          - image_name: finansam-backend
             context: ./backend
             dockerfile: ./backend/Dockerfile
-          - image_name: controle-contas-frontend
+          - image_name: finansam-frontend
             context: ./frontend
             dockerfile: ./frontend/Dockerfile
 

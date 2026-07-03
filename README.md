@@ -70,3 +70,44 @@ Serviços padrão:
 ## Observação sobre dados antigos
 
 Os dados antigos que existiam apenas no navegador não são migrados automaticamente. Se você tinha registros guardados no `localStorage`, será necessário reimportá-los manualmente para o backend.
+
+## Identidade visual
+
+### Tipografia
+
+| Stack | Aplicação |
+|---|---|
+| `'Segoe UI', 'Helvetica Neue', Arial, sans-serif` | Fonte principal de toda a interface |
+
+Pesos tipográficos utilizados: `font-black` (900) em títulos de impacto; `font-bold` e `font-semibold` em textos de hierarquia secundária; peso regular para corpo de texto.
+
+### Paleta de cores
+
+#### Fundos (backgrounds)
+
+| Valor | Contexto |
+|---|---|
+| `#f4efe6` | Bege quente — fundo HTML (fallback CSS) e início do gradiente da aplicação |
+| `#f4efe6 → #fbfaf7 → #f3f6fb` | Gradiente 180° da tela principal (light mode) |
+| `#f8f5ef` | Creme claro — fundo do card de formulário de login |
+| `#020617 → #0f172a → #123047` | Gradiente 135° do header (dark slate/navy) |
+| `#07111f → #10203b → #1e293b` | Gradiente 135° da tela de boas-vindas/login |
+
+#### Texto e neutros
+
+| Tailwind token | Hex | Uso |
+|---|---|---|
+| `slate-900` | `#0f172a` | Cor de texto principal do corpo |
+| `slate-300` → `slate-700` | — | Escala de hierarquia tipográfica |
+| `white` | `#ffffff` | Textos sobre fundos escuros |
+
+#### Cores de acento
+
+| Cor | Tailwind | Hex (500) | Papel na interface |
+|---|---|---|---|
+| Emerald | `emerald` | `#10b981` | **Acento primário** — foco de inputs, estados ativos, indicadores de sucesso, badges Admin, métrica Contas |
+| Sky | `sky` | `#0ea5e9` | **Acento secundário** — perfil operacional, labels de usuário comum |
+| Blue | `blue` | `#3b82f6` | Categoria **Compras** (cards e gráficos) |
+| Indigo | `indigo` | `#6366f1` | Categoria **Investimentos** |
+| Amber | `amber` | `#f59e0b` | Categoria **Manutenções**, estoque, avisos |
+| Rose | `rose` | `#f43f5e` | **Erros**, alertas, ações destrutivas, Total Geral, usuário inativo |

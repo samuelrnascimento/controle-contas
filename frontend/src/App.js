@@ -234,6 +234,12 @@ const PrimaryButton = ({ icon: Icon, onClick, label, disabled }) => (
   </button>
 );
 
+const DangerTextButton = ({ onClick, label }) => (
+  <button type="button" onClick={onClick} className="text-sm font-semibold text-rose-600 transition hover:text-rose-700">
+    {label}
+  </button>
+);
+
 const getPreviousMonth = (monthStr) => {
   const [year, month] = monthStr.split('-').map(Number);
   if (month === 1) {
