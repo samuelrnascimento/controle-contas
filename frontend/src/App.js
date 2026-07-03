@@ -234,16 +234,51 @@ const PrimaryButton = ({ icon: Icon, onClick, label, disabled }) => (
   </button>
 );
 
-const DangerTextButton = ({ onClick, label }) => (
-  <button type="button" onClick={onClick} className="text-sm font-semibold text-rose-600 transition hover:text-rose-700">
-    {label}
-  </button>
-);
+const getPreviousMonth = (monthStr) => {
+  const [year, month] = monthStr.split('-').map(Number);
+  if (month === 1) {
+    return `${year - 1}-12`;
+  }
+  return `${year}-${String(month - 1).padStart(2, '0')}`;
+};
+
+const getNextMonth = (monthStr) => {
+  const [year, month] = monthStr.split('-').map(Number);
+  if (month === 12) {
+    return `${year + 1}-01`;
+  }
+  return `${year}-${String(month + 1).padStart(2, '0')}`;
+};
+
+const getMonthLabel = (monthStr) => {
+  const [year, month] = monthStr.split('-').map(Number);
+  const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  return `${meses[month - 1]} ${year}`;
+};
 
 const FilterMonth = ({ value, onChange }) => (
-  <div className="mt-6 max-w-xs">
-    <label className="mb-2 block text-sm font-semibold text-slate-700">Filtrar por mês</label>
-    <Field type="month" value={value} onChange={onChange} />
+  <div className="mt-6 flex items-center justify-between gap-4">
+    <div>
+      <label className="mb-2 block text-sm font-semibold text-slate-700">Filtrar por mês</label>
+      <div className="flex gap-2">
+        <button 
+          type="button"
+          onClick={() => onChange(getPreviousMonth(value))}
+          className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-200"
+        >
+          ← Anterior
+        </button>
+        <Field type="month" value={value} onChange={onChange} />
+        <button 
+          type="button"
+          onClick={() => onChange(getNextMonth(value))}
+          className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-200"
+        >
+          Próximo →
+        </button>
+      </div>
+    </div>
+    <span className="text-lg font-bold text-slate-800">{getMonthLabel(value)}</span>
   </div>
 );
 
