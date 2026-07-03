@@ -37,7 +37,7 @@ const defaultDate = new Date().toISOString().slice(0, 10);
 const emptyCompra = () => ({ item: '', quantidade: '', valor: '', mes: defaultMonth });
 const emptyConta = () => ({ tipo: '', valor: '', mes: defaultMonth });
 const emptyManutencao = () => ({ descricao: '', valor: '', data: defaultDate });
-const emptyInvestimento = () => ({ descricao: '', valor: '', mes: defaultMonth });
+const emptyInvestimento = () => ({ descricao: '', valor: '', mes: defaultMonth, nota: '' });
 const emptyNovoUsuario = () => ({ name: '', email: '', password: '' });
 const emptyCreateTenantForm = () => ({
   firstName: '',
@@ -1306,27 +1306,31 @@ const FinanceApp = () => {
             {activeTab === 'investimentos' && (
               <div>
                 <SectionHeader title="Investimentos" description="Aportes mensais de investimentos e reservas." />
-                <div className="mt-6 grid gap-4 md:grid-cols-4">
-                  <select
-                    value={novoInvestimento.descricao}
-                    onChange={(event) => setNovoInvestimento((current) => ({ ...current, descricao: event.target.value }))}
-                    className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
-                  >
-                    {categoriasInvestimento.length === 0 && <option value="">Cadastre categorias na aba Categorias</option>}
-                    {categoriasInvestimento.map((categoria) => (
-                      <option key={categoria} value={categoria}>{categoria}</option>
-                    ))}
-                  </select>
-                  <Field type="number" value={novoInvestimento.valor} onChange={(value) => setNovoInvestimento((current) => ({ ...current, valor: value }))} placeholder="Valor" />
-                  <Field type="month" value={novoInvestimento.mes} onChange={(value) => setNovoInvestimento((current) => ({ ...current, mes: value }))} />
-                  <PrimaryButton icon={PlusCircle} onClick={adicionarInvestimento} disabled={loading || categoriasInvestimento.length === 0} label="Adicionar" />
+                <div className="mt-6 space-y-4">
+                  <div className="grid gap-4 md:grid-cols-4">
+                    <select
+                      value={novoInvestimento.descricao}
+                      onChange={(event) => setNovoInvestimento((current) => ({ ...current, descricao: event.target.value }))}
+                      className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                    >
+                      {categoriasInvestimento.length === 0 && <option value="">Cadastre categorias na aba Categorias</option>}
+                      {categoriasInvestimento.map((categoria) => (
+                        <option key={categoria} value={categoria}>{categoria}</option>
+                      ))}
+                    </select>
+                    <Field type="number" value={novoInvestimento.valor} onChange={(value) => setNovoInvestimento((current) => ({ ...current, valor: value }))} placeholder="Valor" />
+                    <Field type="month" value={novoInvestimento.mes} onChange={(value) => setNovoInvestimento((current) => ({ ...current, mes: value }))} />
+                    <PrimaryButton icon={PlusCircle} onClick={adicionarInvestimento} disabled={loading || categoriasInvestimento.length === 0} label="Adicionar" />
+                  </div>
+                  <Field value={novoInvestimento.nota} onChange={(value) => setNovoInvestimento((current) => ({ ...current, nota: value }))} placeholder="Descrição (opcional)" />
                 </div>
                 <FilterMonth value={mesFiltroInvestimentos} onChange={setMesFiltroInvestimentos} />
                 <DataTable
-                  headers={['Categoria', 'Valor', 'Mês', 'Ações']}
+                  headers={['Categoria', 'Valor', 'Descrição', 'Mês', 'Ações']}
                   rows={investimentos.filter((investimento) => investimento.mes === mesFiltroInvestimentos).map((investimento) => [
                     investimento.descricao,
                     formatCurrency(investimento.valor),
+                    investimento.nota || '-',
                     investimento.mes,
                     isAdmin ? (
                       <DangerTextButton key={`delete-investimento-${investimento.id}`} onClick={() => excluirRegistro(`/investimentos/${investimento.id}`, 'Investimento excluído com sucesso')} label="Excluir" />
@@ -1991,7 +1995,6 @@ const FinanceApp = () => {
             <div className="rounded-[28px] bg-slate-950 p-6 text-white shadow-xl shadow-slate-300/40">
               <p className="text-sm uppercase tracking-[0.22em] text-emerald-300">Resumo</p>
               <div className="mt-4 space-y-4">
-                {!isPlatformAdmin && <SummaryRow label="Compras cadastradas" value={String(compras.length)} />}
                 {!isPlatformAdmin && <SummaryRow label="Contas cadastradas" value={String(contas.length)} />}
                 {!isPlatformAdmin && <SummaryRow label="Investimentos" value={String(investimentos.length)} />}
                 {!isPlatformAdmin && <SummaryRow label="Manutenções" value={String(manutencoes.length)} />}

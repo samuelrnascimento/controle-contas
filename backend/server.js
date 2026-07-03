@@ -266,6 +266,7 @@ const ensureSchema = async () => {
 
     ALTER TABLE investimentos ADD COLUMN IF NOT EXISTS tenant_id TEXT;
     ALTER TABLE investimentos ALTER COLUMN tenant_id TYPE TEXT USING tenant_id::text;
+    ALTER TABLE investimentos ADD COLUMN IF NOT EXISTS nota TEXT;
 
     CREATE TABLE IF NOT EXISTS categorias (
       id SERIAL PRIMARY KEY,
@@ -1036,7 +1037,7 @@ app.get('/api/investimentos', authenticateToken, requireTenantScope, async (req,
 });
 
 app.post('/api/investimentos', authenticateToken, requireTenantScope, async (req, res) => {
-  const { descricao, valor, mes } = req.body;
+  const { descricao, valor, mes, nota } = req.body;
   const valorNumerico = parseAmount(valor);
 
   if (!descricao || !mes || valorNumerico === null) {
@@ -1046,12 +1047,12 @@ app.post('/api/investimentos', authenticateToken, requireTenantScope, async (req
   try {
     const result = runtimeCapabilities.hasInvestimentosTenantId
       ? await pool.query(
-        'INSERT INTO investimentos (tenant_id, descricao, valor, mes) VALUES ($1, $2, $3, $4) RETURNING *',
-        [req.user.tenant_id, descricao, valorNumerico, mes]
+        'INSERT INTO investimentos (tenant_id, descricao, valor, mes, nota) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+        [req.user.tenant_id, descricao, valorNumerico, mes, nota || null]
       )
       : await pool.query(
-        'INSERT INTO investimentos (descricao, valor, mes) VALUES ($1, $2, $3) RETURNING *',
-        [descricao, valorNumerico, mes]
+        'INSERT INTO investimentos (descricao, valor, mes, nota) VALUES ($1, $2, $3, $4) RETURNING *',
+        [descricao, valorNumerico, mes, nota || null]
       );
 
     res.status(201).json(result.rows[0]);
