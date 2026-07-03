@@ -818,6 +818,155 @@ app.post('/api/compras', authenticateToken, requireTenantScope, async (req, res)
   }
 });
 
+app.patch('/api/compras/:id', authenticateToken, requireTenantScope, requireRole('admin'), async (req, res) => {
+  const { item, quantidade, valor, mes } = req.body;
+  const quantidadeNumerica = parseAmount(quantidade);
+  const valorNumerico = parseAmount(valor);
+
+  if (!item || !mes || quantidadeNumerica === null || valorNumerico === null) {
+    return res.status(400).json({ error: 'Dados de compra inválidos' });
+  }
+
+  const client = await pool.connect();
+
+  const findStockByItem = async (targetItem) => {
+    if (runtimeCapabilities.hasEstoqueTenantId) {
+      return client.query(
+        'SELECT * FROM estoque WHERE tenant_id = $1 AND LOWER(item) = LOWER($2) LIMIT 1',
+        [req.user.tenant_id, targetItem]
+      );
+    }
+
+    return client.query(
+      'SELECT * FROM estoque WHERE LOWER(item) = LOWER($1) LIMIT 1',
+      [targetItem]
+    );
+  };
+
+  const addToStock = async (targetItem, amount) => {
+    const existingStock = await findStockByItem(targetItem);
+
+    if (existingStock.rows.length > 0) {
+      if (runtimeCapabilities.hasEstoqueTenantId) {
+        await client.query(
+          'UPDATE estoque SET quantidade = quantidade + $1, updated_at = CURRENT_TIMESTAMP WHERE tenant_id = $2 AND LOWER(item) = LOWER($3)',
+          [amount, req.user.tenant_id, targetItem]
+        );
+      } else {
+        await client.query(
+          'UPDATE estoque SET quantidade = quantidade + $1, updated_at = CURRENT_TIMESTAMP WHERE LOWER(item) = LOWER($2)',
+          [amount, targetItem]
+        );
+      }
+      return;
+    }
+
+    if (runtimeCapabilities.hasEstoqueTenantId) {
+      await client.query(
+        'INSERT INTO estoque (tenant_id, item, quantidade) VALUES ($1, $2, $3)',
+        [req.user.tenant_id, targetItem, amount]
+      );
+    } else {
+      await client.query(
+        'INSERT INTO estoque (item, quantidade) VALUES ($1, $2)',
+        [targetItem, amount]
+      );
+    }
+  };
+
+  const removeFromStock = async (targetItem, amount) => {
+    const existingStock = await findStockByItem(targetItem);
+
+    if (existingStock.rows.length === 0 || Number(existingStock.rows[0].quantidade) < amount) {
+      throw new Error('Não há estoque suficiente para editar esta compra');
+    }
+
+    const nextQuantidade = Number(existingStock.rows[0].quantidade) - amount;
+
+    if (nextQuantidade === 0) {
+      if (runtimeCapabilities.hasEstoqueTenantId) {
+        await client.query(
+          'DELETE FROM estoque WHERE tenant_id = $1 AND LOWER(item) = LOWER($2)',
+          [req.user.tenant_id, targetItem]
+        );
+      } else {
+        await client.query('DELETE FROM estoque WHERE LOWER(item) = LOWER($1)', [targetItem]);
+      }
+
+      return;
+    }
+
+    if (runtimeCapabilities.hasEstoqueTenantId) {
+      await client.query(
+        'UPDATE estoque SET quantidade = $1, updated_at = CURRENT_TIMESTAMP WHERE tenant_id = $2 AND LOWER(item) = LOWER($3)',
+        [nextQuantidade, req.user.tenant_id, targetItem]
+      );
+    } else {
+      await client.query(
+        'UPDATE estoque SET quantidade = $1, updated_at = CURRENT_TIMESTAMP WHERE LOWER(item) = LOWER($2)',
+        [nextQuantidade, targetItem]
+      );
+    }
+  };
+
+  try {
+    await client.query('BEGIN');
+
+    const currentCompra = runtimeCapabilities.hasComprasTenantId
+      ? await client.query('SELECT * FROM compras WHERE id::text = $1 AND tenant_id = $2 LIMIT 1', [req.params.id, req.user.tenant_id])
+      : await client.query('SELECT * FROM compras WHERE id::text = $1 LIMIT 1', [req.params.id]);
+
+    if (currentCompra.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Compra não encontrada' });
+    }
+
+    const compraAtual = currentCompra.rows[0];
+    const itemAtual = String(compraAtual.item || '');
+    const quantidadeAtual = Number(compraAtual.quantidade || 0);
+    const sameItem = itemAtual.trim().toLowerCase() === String(item).trim().toLowerCase();
+
+    if (sameItem) {
+      const delta = quantidadeNumerica - quantidadeAtual;
+
+      if (delta > 0) {
+        await addToStock(item, delta);
+      }
+
+      if (delta < 0) {
+        await removeFromStock(item, Math.abs(delta));
+      }
+    } else {
+      await removeFromStock(itemAtual, quantidadeAtual);
+      await addToStock(item, quantidadeNumerica);
+    }
+
+    const result = runtimeCapabilities.hasComprasTenantId
+      ? await client.query(
+        `UPDATE compras
+         SET item = $1, quantidade = $2, valor = $3, mes = $4
+         WHERE id::text = $5 AND tenant_id = $6
+         RETURNING *`,
+        [item, quantidadeNumerica, valorNumerico, mes, req.params.id, req.user.tenant_id]
+      )
+      : await client.query(
+        `UPDATE compras
+         SET item = $1, quantidade = $2, valor = $3, mes = $4
+         WHERE id::text = $5
+         RETURNING *`,
+        [item, quantidadeNumerica, valorNumerico, mes, req.params.id]
+      );
+
+    await client.query('COMMIT');
+    return res.json(result.rows[0]);
+  } catch (error) {
+    await client.query('ROLLBACK');
+    return res.status(500).json({ error: error.message });
+  } finally {
+    client.release();
+  }
+});
+
 app.delete('/api/compras/:id', authenticateToken, requireTenantScope, requireRole('admin'), async (req, res) => {
   try {
     if (runtimeCapabilities.hasComprasTenantId) {
@@ -982,6 +1131,41 @@ app.post('/api/contas', authenticateToken, requireTenantScope, async (req, res) 
   }
 });
 
+app.patch('/api/contas/:id', authenticateToken, requireTenantScope, requireRole('admin'), async (req, res) => {
+  const { tipo, valor, mes } = req.body;
+  const valorNumerico = parseAmount(valor);
+
+  if (!tipo || !mes || valorNumerico === null) {
+    return res.status(400).json({ error: 'Dados de conta inválidos' });
+  }
+
+  try {
+    const result = runtimeCapabilities.hasContasTenantId
+      ? await pool.query(
+        `UPDATE contas
+         SET tipo = $1, valor = $2, mes = $3
+         WHERE id::text = $4 AND tenant_id = $5
+         RETURNING *`,
+        [tipo, valorNumerico, mes, req.params.id, req.user.tenant_id]
+      )
+      : await pool.query(
+        `UPDATE contas
+         SET tipo = $1, valor = $2, mes = $3
+         WHERE id::text = $4
+         RETURNING *`,
+        [tipo, valorNumerico, mes, req.params.id]
+      );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Conta não encontrada' });
+    }
+
+    return res.json(result.rows[0]);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 app.delete('/api/contas/:id', authenticateToken, requireTenantScope, requireRole('admin'), async (req, res) => {
   try {
     if (runtimeCapabilities.hasContasTenantId) {
@@ -1030,6 +1214,41 @@ app.post('/api/lazer', authenticateToken, requireTenantScope, async (req, res) =
     res.status(201).json(result.rows[0]);
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+app.patch('/api/lazer/:id', authenticateToken, requireTenantScope, requireRole('admin'), async (req, res) => {
+  const { descricao, valor, mes } = req.body;
+  const valorNumerico = parseAmount(valor);
+
+  if (!descricao || !mes || valorNumerico === null) {
+    return res.status(400).json({ error: 'Dados de despesa de lazer inválidos' });
+  }
+
+  try {
+    const result = runtimeCapabilities.hasLazerTenantId
+      ? await pool.query(
+        `UPDATE lazer
+         SET descricao = $1, valor = $2, mes = $3
+         WHERE id::text = $4 AND tenant_id = $5
+         RETURNING *`,
+        [descricao, valorNumerico, mes, req.params.id, req.user.tenant_id]
+      )
+      : await pool.query(
+        `UPDATE lazer
+         SET descricao = $1, valor = $2, mes = $3
+         WHERE id::text = $4
+         RETURNING *`,
+        [descricao, valorNumerico, mes, req.params.id]
+      );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Despesa de lazer não encontrada' });
+    }
+
+    return res.json(result.rows[0]);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
   }
 });
 
@@ -1084,6 +1303,41 @@ app.post('/api/manutencoes', authenticateToken, requireTenantScope, async (req, 
   }
 });
 
+app.patch('/api/manutencoes/:id', authenticateToken, requireTenantScope, requireRole('admin'), async (req, res) => {
+  const { descricao, valor, data } = req.body;
+  const valorNumerico = parseAmount(valor);
+
+  if (!descricao || !data || valorNumerico === null) {
+    return res.status(400).json({ error: 'Dados de manutenção inválidos' });
+  }
+
+  try {
+    const result = runtimeCapabilities.hasManutencoesTenantId
+      ? await pool.query(
+        `UPDATE manutencoes
+         SET descricao = $1, valor = $2, data = $3
+         WHERE id::text = $4 AND tenant_id = $5
+         RETURNING *`,
+        [descricao, valorNumerico, data, req.params.id, req.user.tenant_id]
+      )
+      : await pool.query(
+        `UPDATE manutencoes
+         SET descricao = $1, valor = $2, data = $3
+         WHERE id::text = $4
+         RETURNING *`,
+        [descricao, valorNumerico, data, req.params.id]
+      );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Despesa extraordinária não encontrada' });
+    }
+
+    return res.json(result.rows[0]);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 app.delete('/api/manutencoes/:id', authenticateToken, requireTenantScope, requireRole('admin'), async (req, res) => {
   try {
     if (runtimeCapabilities.hasManutencoesTenantId) {
@@ -1132,6 +1386,41 @@ app.post('/api/investimentos', authenticateToken, requireTenantScope, async (req
     res.status(201).json(result.rows[0]);
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+app.patch('/api/investimentos/:id', authenticateToken, requireTenantScope, requireRole('admin'), async (req, res) => {
+  const { descricao, valor, mes, nota } = req.body;
+  const valorNumerico = parseAmount(valor);
+
+  if (!descricao || !mes || valorNumerico === null) {
+    return res.status(400).json({ error: 'Dados de investimento inválidos' });
+  }
+
+  try {
+    const result = runtimeCapabilities.hasInvestimentosTenantId
+      ? await pool.query(
+        `UPDATE investimentos
+         SET descricao = $1, valor = $2, mes = $3, nota = $4
+         WHERE id::text = $5 AND tenant_id = $6
+         RETURNING *`,
+        [descricao, valorNumerico, mes, nota || null, req.params.id, req.user.tenant_id]
+      )
+      : await pool.query(
+        `UPDATE investimentos
+         SET descricao = $1, valor = $2, mes = $3, nota = $4
+         WHERE id::text = $5
+         RETURNING *`,
+        [descricao, valorNumerico, mes, nota || null, req.params.id]
+      );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Investimento não encontrado' });
+    }
+
+    return res.json(result.rows[0]);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
   }
 });
 

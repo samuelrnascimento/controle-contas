@@ -246,6 +246,12 @@ const DangerTextButton = ({ onClick, label }) => (
   </button>
 );
 
+const SecondaryTextButton = ({ onClick, label }) => (
+  <button type="button" onClick={onClick} className="text-sm font-semibold text-slate-700 transition hover:text-slate-900">
+    {label}
+  </button>
+);
+
 const getPreviousMonth = (monthStr) => {
   const [year, month] = monthStr.split('-').map(Number);
   if (month === 1) {
@@ -660,6 +666,162 @@ const FinanceApp = () => {
       });
       setNovoInvestimento(emptyInvestimento());
     }, 'Investimento adicionado com sucesso');
+  };
+
+  const editarCompra = async (compra) => {
+    const item = window.prompt('Editar item da compra', compra.item || '');
+    if (item === null) {
+      return;
+    }
+
+    const quantidade = window.prompt('Editar quantidade', String(compra.quantidade || ''));
+    if (quantidade === null) {
+      return;
+    }
+
+    const valor = window.prompt('Editar valor', String(compra.valor || ''));
+    if (valor === null) {
+      return;
+    }
+
+    const mes = window.prompt('Editar mês (YYYY-MM)', compra.mes || defaultMonth);
+    if (mes === null) {
+      return;
+    }
+
+    if (!item.trim() || !quantidade.trim() || !valor.trim() || !mes.trim()) {
+      setErrorMessage('Preencha todos os campos da compra para editar');
+      return;
+    }
+
+    await runMutation(async () => {
+      await apiFetch(`/compras/${compra.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ item: item.trim(), quantidade: quantidade.trim(), valor: valor.trim(), mes: mes.trim() })
+      });
+    }, 'Compra atualizada com sucesso');
+  };
+
+  const editarConta = async (conta) => {
+    const tipo = window.prompt('Editar categoria da conta', conta.tipo || '');
+    if (tipo === null) {
+      return;
+    }
+
+    const valor = window.prompt('Editar valor', String(conta.valor || ''));
+    if (valor === null) {
+      return;
+    }
+
+    const mes = window.prompt('Editar mês (YYYY-MM)', conta.mes || defaultMonth);
+    if (mes === null) {
+      return;
+    }
+
+    if (!tipo.trim() || !valor.trim() || !mes.trim()) {
+      setErrorMessage('Preencha todos os campos da conta para editar');
+      return;
+    }
+
+    await runMutation(async () => {
+      await apiFetch(`/contas/${conta.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ tipo: tipo.trim(), valor: valor.trim(), mes: mes.trim() })
+      });
+    }, 'Conta atualizada com sucesso');
+  };
+
+  const editarLazer = async (item) => {
+    const descricao = window.prompt('Editar descrição da despesa de lazer', item.descricao || '');
+    if (descricao === null) {
+      return;
+    }
+
+    const valor = window.prompt('Editar valor', String(item.valor || ''));
+    if (valor === null) {
+      return;
+    }
+
+    const mes = window.prompt('Editar mês (YYYY-MM)', item.mes || defaultMonth);
+    if (mes === null) {
+      return;
+    }
+
+    if (!descricao.trim() || !valor.trim() || !mes.trim()) {
+      setErrorMessage('Preencha todos os campos da despesa de lazer para editar');
+      return;
+    }
+
+    await runMutation(async () => {
+      await apiFetch(`/lazer/${item.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ descricao: descricao.trim(), valor: valor.trim(), mes: mes.trim() })
+      });
+    }, 'Despesa de lazer atualizada com sucesso');
+  };
+
+  const editarManutencao = async (manutencao) => {
+    const descricao = window.prompt('Editar descrição da despesa extraordinária', manutencao.descricao || '');
+    if (descricao === null) {
+      return;
+    }
+
+    const valor = window.prompt('Editar valor', String(manutencao.valor || ''));
+    if (valor === null) {
+      return;
+    }
+
+    const dataAtual = String(manutencao.data || '').slice(0, 10) || defaultDate;
+    const data = window.prompt('Editar data (YYYY-MM-DD)', dataAtual);
+    if (data === null) {
+      return;
+    }
+
+    if (!descricao.trim() || !valor.trim() || !data.trim()) {
+      setErrorMessage('Preencha todos os campos da despesa extraordinária para editar');
+      return;
+    }
+
+    await runMutation(async () => {
+      await apiFetch(`/manutencoes/${manutencao.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ descricao: descricao.trim(), valor: valor.trim(), data: data.trim() })
+      });
+    }, 'Despesa extraordinária atualizada com sucesso');
+  };
+
+  const editarInvestimento = async (investimento) => {
+    const descricao = window.prompt('Editar categoria do investimento', investimento.descricao || '');
+    if (descricao === null) {
+      return;
+    }
+
+    const valor = window.prompt('Editar valor', String(investimento.valor || ''));
+    if (valor === null) {
+      return;
+    }
+
+    const mes = window.prompt('Editar mês (YYYY-MM)', investimento.mes || defaultMonth);
+    if (mes === null) {
+      return;
+    }
+
+    const nota = window.prompt('Editar descrição (opcional)', investimento.nota || '');
+    if (nota === null) {
+      return;
+    }
+
+    if (!descricao.trim() || !valor.trim() || !mes.trim()) {
+      setErrorMessage('Preencha categoria, valor e mês para editar o investimento');
+      return;
+    }
+
+    await runMutation(async () => {
+      await apiFetch(`/investimentos/${investimento.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ descricao: descricao.trim(), valor: valor.trim(), mes: mes.trim(), nota: nota.trim() })
+      });
+    }, 'Investimento atualizado com sucesso');
   };
 
   const adicionarCategoria = async (scope, rawName) => {
@@ -1305,9 +1467,12 @@ const FinanceApp = () => {
                     formatCurrency(compra.valor),
                     compra.mes,
                     isAdmin ? (
-                      <DangerTextButton key={`delete-compra-${compra.id}`} onClick={() => excluirRegistro(`/compras/${compra.id}`, 'Compra excluída com sucesso')} label="Excluir" />
+                      <div key={`actions-compra-${compra.id}`} className="flex items-center gap-3">
+                        <SecondaryTextButton onClick={() => editarCompra(compra)} label="Editar" />
+                        <DangerTextButton onClick={() => excluirRegistro(`/compras/${compra.id}`, 'Compra excluída com sucesso')} label="Excluir" />
+                      </div>
                     ) : (
-                      <span key={`readonly-compra-${compra.id}`} className="text-sm text-slate-400">Somente admin exclui</span>
+                      <span key={`readonly-compra-${compra.id}`} className="text-sm text-slate-400">Somente admin altera/exclui</span>
                     )
                   ])}
                   emptyMessage="Nenhuma compra registrada para este mês"
@@ -1341,9 +1506,12 @@ const FinanceApp = () => {
                     formatCurrency(conta.valor),
                     conta.mes,
                     isAdmin ? (
-                      <DangerTextButton key={`delete-conta-${conta.id}`} onClick={() => excluirRegistro(`/contas/${conta.id}`, 'Conta excluída com sucesso')} label="Excluir" />
+                      <div key={`actions-conta-${conta.id}`} className="flex items-center gap-3">
+                        <SecondaryTextButton onClick={() => editarConta(conta)} label="Editar" />
+                        <DangerTextButton onClick={() => excluirRegistro(`/contas/${conta.id}`, 'Conta excluída com sucesso')} label="Excluir" />
+                      </div>
                     ) : (
-                      <span key={`readonly-conta-${conta.id}`} className="text-sm text-slate-400">Somente admin exclui</span>
+                      <span key={`readonly-conta-${conta.id}`} className="text-sm text-slate-400">Somente admin altera/exclui</span>
                     )
                   ])}
                   emptyMessage="Nenhuma conta registrada para este mês"
@@ -1368,9 +1536,12 @@ const FinanceApp = () => {
                     formatCurrency(item.valor),
                     item.mes,
                     isAdmin ? (
-                      <DangerTextButton key={`delete-lazer-${item.id}`} onClick={() => excluirRegistro(`/lazer/${item.id}`, 'Despesa de lazer excluída com sucesso')} label="Excluir" />
+                      <div key={`actions-lazer-${item.id}`} className="flex items-center gap-3">
+                        <SecondaryTextButton onClick={() => editarLazer(item)} label="Editar" />
+                        <DangerTextButton onClick={() => excluirRegistro(`/lazer/${item.id}`, 'Despesa de lazer excluída com sucesso')} label="Excluir" />
+                      </div>
                     ) : (
-                      <span key={`readonly-lazer-${item.id}`} className="text-sm text-slate-400">Somente admin exclui</span>
+                      <span key={`readonly-lazer-${item.id}`} className="text-sm text-slate-400">Somente admin altera/exclui</span>
                     )
                   ])}
                   emptyMessage="Nenhuma despesa de lazer registrada para este mês"
@@ -1395,9 +1566,12 @@ const FinanceApp = () => {
                     formatCurrency(manutencao.valor),
                     new Date(manutencao.data).toLocaleDateString('pt-BR'),
                     isAdmin ? (
-                      <DangerTextButton key={`delete-manutencao-${manutencao.id}`} onClick={() => excluirRegistro(`/manutencoes/${manutencao.id}`, 'Despesa extraordinária excluída com sucesso')} label="Excluir" />
+                      <div key={`actions-manutencao-${manutencao.id}`} className="flex items-center gap-3">
+                        <SecondaryTextButton onClick={() => editarManutencao(manutencao)} label="Editar" />
+                        <DangerTextButton onClick={() => excluirRegistro(`/manutencoes/${manutencao.id}`, 'Despesa extraordinária excluída com sucesso')} label="Excluir" />
+                      </div>
                     ) : (
-                      <span key={`readonly-manutencao-${manutencao.id}`} className="text-sm text-slate-400">Somente admin exclui</span>
+                      <span key={`readonly-manutencao-${manutencao.id}`} className="text-sm text-slate-400">Somente admin altera/exclui</span>
                     )
                   ])}
                   emptyMessage="Nenhuma manutenção registrada para este mês"
@@ -1435,9 +1609,12 @@ const FinanceApp = () => {
                     investimento.nota || '-',
                     investimento.mes,
                     isAdmin ? (
-                      <DangerTextButton key={`delete-investimento-${investimento.id}`} onClick={() => excluirRegistro(`/investimentos/${investimento.id}`, 'Investimento excluído com sucesso')} label="Excluir" />
+                      <div key={`actions-investimento-${investimento.id}`} className="flex items-center gap-3">
+                        <SecondaryTextButton onClick={() => editarInvestimento(investimento)} label="Editar" />
+                        <DangerTextButton onClick={() => excluirRegistro(`/investimentos/${investimento.id}`, 'Investimento excluído com sucesso')} label="Excluir" />
+                      </div>
                     ) : (
-                      <span key={`readonly-investimento-${investimento.id}`} className="text-sm text-slate-400">Somente admin exclui</span>
+                      <span key={`readonly-investimento-${investimento.id}`} className="text-sm text-slate-400">Somente admin altera/exclui</span>
                     )
                   ])}
                   emptyMessage="Nenhum investimento registrado para este mês"
