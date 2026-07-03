@@ -365,6 +365,11 @@ const FinanceApp = () => {
   const [novoLazer, setNovoLazer] = useState(emptyLazer());
   const [novoInvestimento, setNovoInvestimento] = useState(emptyInvestimento());
   const [novaManutencao, setNovaManutencao] = useState(emptyManutencao());
+  const [editingCompraId, setEditingCompraId] = useState(null);
+  const [editingContaId, setEditingContaId] = useState(null);
+  const [editingLazerId, setEditingLazerId] = useState(null);
+  const [editingManutencaoId, setEditingManutencaoId] = useState(null);
+  const [editingInvestimentoId, setEditingInvestimentoId] = useState(null);
   const [novoUsuario, setNovoUsuario] = useState(emptyNovoUsuario());
   const [novaCategoriaConta, setNovaCategoriaConta] = useState('');
   const [novaCategoriaInvestimento, setNovaCategoriaInvestimento] = useState('');
@@ -600,12 +605,20 @@ const FinanceApp = () => {
     }
 
     await runMutation(async () => {
-      await apiFetch('/compras', {
-        method: 'POST',
-        body: JSON.stringify(novaCompra)
-      });
+      if (editingCompraId) {
+        await apiFetch(`/compras/${editingCompraId}`, {
+          method: 'PATCH',
+          body: JSON.stringify(novaCompra)
+        });
+        setEditingCompraId(null);
+      } else {
+        await apiFetch('/compras', {
+          method: 'POST',
+          body: JSON.stringify(novaCompra)
+        });
+      }
       setNovaCompra(emptyCompra());
-    }, 'Compra adicionada com sucesso');
+    }, editingCompraId ? 'Compra atualizada com sucesso' : 'Compra adicionada com sucesso');
   };
 
   const adicionarConta = async () => {
@@ -615,12 +628,20 @@ const FinanceApp = () => {
     }
 
     await runMutation(async () => {
-      await apiFetch('/contas', {
-        method: 'POST',
-        body: JSON.stringify(novaConta)
-      });
+      if (editingContaId) {
+        await apiFetch(`/contas/${editingContaId}`, {
+          method: 'PATCH',
+          body: JSON.stringify(novaConta)
+        });
+        setEditingContaId(null);
+      } else {
+        await apiFetch('/contas', {
+          method: 'POST',
+          body: JSON.stringify(novaConta)
+        });
+      }
       setNovaConta(emptyConta());
-    }, 'Conta adicionada com sucesso');
+    }, editingContaId ? 'Conta atualizada com sucesso' : 'Conta adicionada com sucesso');
   };
 
   const adicionarLazer = async () => {
@@ -630,12 +651,20 @@ const FinanceApp = () => {
     }
 
     await runMutation(async () => {
-      await apiFetch('/lazer', {
-        method: 'POST',
-        body: JSON.stringify(novoLazer)
-      });
+      if (editingLazerId) {
+        await apiFetch(`/lazer/${editingLazerId}`, {
+          method: 'PATCH',
+          body: JSON.stringify(novoLazer)
+        });
+        setEditingLazerId(null);
+      } else {
+        await apiFetch('/lazer', {
+          method: 'POST',
+          body: JSON.stringify(novoLazer)
+        });
+      }
       setNovoLazer(emptyLazer());
-    }, 'Despesa de lazer adicionada com sucesso');
+    }, editingLazerId ? 'Despesa de lazer atualizada com sucesso' : 'Despesa de lazer adicionada com sucesso');
   };
 
   const adicionarManutencao = async () => {
@@ -645,12 +674,20 @@ const FinanceApp = () => {
     }
 
     await runMutation(async () => {
-      await apiFetch('/manutencoes', {
-        method: 'POST',
-        body: JSON.stringify(novaManutencao)
-      });
+      if (editingManutencaoId) {
+        await apiFetch(`/manutencoes/${editingManutencaoId}`, {
+          method: 'PATCH',
+          body: JSON.stringify(novaManutencao)
+        });
+        setEditingManutencaoId(null);
+      } else {
+        await apiFetch('/manutencoes', {
+          method: 'POST',
+          body: JSON.stringify(novaManutencao)
+        });
+      }
       setNovaManutencao(emptyManutencao());
-    }, 'Despesa extraordinária adicionada com sucesso');
+    }, editingManutencaoId ? 'Despesa extraordinária atualizada com sucesso' : 'Despesa extraordinária adicionada com sucesso');
   };
 
   const adicionarInvestimento = async () => {
@@ -660,168 +697,89 @@ const FinanceApp = () => {
     }
 
     await runMutation(async () => {
-      await apiFetch('/investimentos', {
-        method: 'POST',
-        body: JSON.stringify(novoInvestimento)
-      });
+      if (editingInvestimentoId) {
+        await apiFetch(`/investimentos/${editingInvestimentoId}`, {
+          method: 'PATCH',
+          body: JSON.stringify(novoInvestimento)
+        });
+        setEditingInvestimentoId(null);
+      } else {
+        await apiFetch('/investimentos', {
+          method: 'POST',
+          body: JSON.stringify(novoInvestimento)
+        });
+      }
       setNovoInvestimento(emptyInvestimento());
-    }, 'Investimento adicionado com sucesso');
+    }, editingInvestimentoId ? 'Investimento atualizado com sucesso' : 'Investimento adicionado com sucesso');
   };
 
-  const editarCompra = async (compra) => {
-    const item = window.prompt('Editar item da compra', compra.item || '');
-    if (item === null) {
-      return;
-    }
-
-    const quantidade = window.prompt('Editar quantidade', String(compra.quantidade || ''));
-    if (quantidade === null) {
-      return;
-    }
-
-    const valor = window.prompt('Editar valor', String(compra.valor || ''));
-    if (valor === null) {
-      return;
-    }
-
-    const mes = window.prompt('Editar mês (YYYY-MM)', compra.mes || defaultMonth);
-    if (mes === null) {
-      return;
-    }
-
-    if (!item.trim() || !quantidade.trim() || !valor.trim() || !mes.trim()) {
-      setErrorMessage('Preencha todos os campos da compra para editar');
-      return;
-    }
-
-    await runMutation(async () => {
-      await apiFetch(`/compras/${compra.id}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ item: item.trim(), quantidade: quantidade.trim(), valor: valor.trim(), mes: mes.trim() })
-      });
-    }, 'Compra atualizada com sucesso');
+  const iniciarEdicaoCompra = (compra) => {
+    setActiveTab('compras');
+    setEditingCompraId(compra.id);
+    setNovaCompra({ item: compra.item || '', quantidade: String(compra.quantidade ?? ''), valor: String(compra.valor ?? ''), mes: compra.mes || defaultMonth });
+    clearMessages();
   };
 
-  const editarConta = async (conta) => {
-    const tipo = window.prompt('Editar categoria da conta', conta.tipo || '');
-    if (tipo === null) {
-      return;
-    }
-
-    const valor = window.prompt('Editar valor', String(conta.valor || ''));
-    if (valor === null) {
-      return;
-    }
-
-    const mes = window.prompt('Editar mês (YYYY-MM)', conta.mes || defaultMonth);
-    if (mes === null) {
-      return;
-    }
-
-    if (!tipo.trim() || !valor.trim() || !mes.trim()) {
-      setErrorMessage('Preencha todos os campos da conta para editar');
-      return;
-    }
-
-    await runMutation(async () => {
-      await apiFetch(`/contas/${conta.id}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ tipo: tipo.trim(), valor: valor.trim(), mes: mes.trim() })
-      });
-    }, 'Conta atualizada com sucesso');
+  const iniciarEdicaoConta = (conta) => {
+    setActiveTab('contas');
+    setEditingContaId(conta.id);
+    setNovaConta({ tipo: conta.tipo || '', valor: String(conta.valor ?? ''), mes: conta.mes || defaultMonth });
+    clearMessages();
   };
 
-  const editarLazer = async (item) => {
-    const descricao = window.prompt('Editar descrição da despesa de lazer', item.descricao || '');
-    if (descricao === null) {
-      return;
-    }
-
-    const valor = window.prompt('Editar valor', String(item.valor || ''));
-    if (valor === null) {
-      return;
-    }
-
-    const mes = window.prompt('Editar mês (YYYY-MM)', item.mes || defaultMonth);
-    if (mes === null) {
-      return;
-    }
-
-    if (!descricao.trim() || !valor.trim() || !mes.trim()) {
-      setErrorMessage('Preencha todos os campos da despesa de lazer para editar');
-      return;
-    }
-
-    await runMutation(async () => {
-      await apiFetch(`/lazer/${item.id}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ descricao: descricao.trim(), valor: valor.trim(), mes: mes.trim() })
-      });
-    }, 'Despesa de lazer atualizada com sucesso');
+  const iniciarEdicaoLazer = (item) => {
+    setActiveTab('lazer');
+    setEditingLazerId(item.id);
+    setNovoLazer({ descricao: item.descricao || '', valor: String(item.valor ?? ''), mes: item.mes || defaultMonth });
+    clearMessages();
   };
 
-  const editarManutencao = async (manutencao) => {
-    const descricao = window.prompt('Editar descrição da despesa extraordinária', manutencao.descricao || '');
-    if (descricao === null) {
-      return;
-    }
-
-    const valor = window.prompt('Editar valor', String(manutencao.valor || ''));
-    if (valor === null) {
-      return;
-    }
-
-    const dataAtual = String(manutencao.data || '').slice(0, 10) || defaultDate;
-    const data = window.prompt('Editar data (YYYY-MM-DD)', dataAtual);
-    if (data === null) {
-      return;
-    }
-
-    if (!descricao.trim() || !valor.trim() || !data.trim()) {
-      setErrorMessage('Preencha todos os campos da despesa extraordinária para editar');
-      return;
-    }
-
-    await runMutation(async () => {
-      await apiFetch(`/manutencoes/${manutencao.id}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ descricao: descricao.trim(), valor: valor.trim(), data: data.trim() })
-      });
-    }, 'Despesa extraordinária atualizada com sucesso');
+  const iniciarEdicaoManutencao = (manutencao) => {
+    setActiveTab('manutencoes');
+    setEditingManutencaoId(manutencao.id);
+    setNovaManutencao({
+      descricao: manutencao.descricao || '',
+      valor: String(manutencao.valor ?? ''),
+      data: String(manutencao.data || '').slice(0, 10) || defaultDate
+    });
+    clearMessages();
   };
 
-  const editarInvestimento = async (investimento) => {
-    const descricao = window.prompt('Editar categoria do investimento', investimento.descricao || '');
-    if (descricao === null) {
-      return;
-    }
+  const iniciarEdicaoInvestimento = (investimento) => {
+    setActiveTab('investimentos');
+    setEditingInvestimentoId(investimento.id);
+    setNovoInvestimento({
+      descricao: investimento.descricao || '',
+      valor: String(investimento.valor ?? ''),
+      mes: investimento.mes || defaultMonth,
+      nota: investimento.nota || ''
+    });
+    clearMessages();
+  };
 
-    const valor = window.prompt('Editar valor', String(investimento.valor || ''));
-    if (valor === null) {
-      return;
-    }
+  const cancelarEdicaoCompra = () => {
+    setEditingCompraId(null);
+    setNovaCompra(emptyCompra());
+  };
 
-    const mes = window.prompt('Editar mês (YYYY-MM)', investimento.mes || defaultMonth);
-    if (mes === null) {
-      return;
-    }
+  const cancelarEdicaoConta = () => {
+    setEditingContaId(null);
+    setNovaConta(emptyConta());
+  };
 
-    const nota = window.prompt('Editar descrição (opcional)', investimento.nota || '');
-    if (nota === null) {
-      return;
-    }
+  const cancelarEdicaoLazer = () => {
+    setEditingLazerId(null);
+    setNovoLazer(emptyLazer());
+  };
 
-    if (!descricao.trim() || !valor.trim() || !mes.trim()) {
-      setErrorMessage('Preencha categoria, valor e mês para editar o investimento');
-      return;
-    }
+  const cancelarEdicaoManutencao = () => {
+    setEditingManutencaoId(null);
+    setNovaManutencao(emptyManutencao());
+  };
 
-    await runMutation(async () => {
-      await apiFetch(`/investimentos/${investimento.id}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ descricao: descricao.trim(), valor: valor.trim(), mes: mes.trim(), nota: nota.trim() })
-      });
-    }, 'Investimento atualizado com sucesso');
+  const cancelarEdicaoInvestimento = () => {
+    setEditingInvestimentoId(null);
+    setNovoInvestimento(emptyInvestimento());
   };
 
   const adicionarCategoria = async (scope, rawName) => {
@@ -1451,13 +1409,23 @@ const FinanceApp = () => {
             {activeTab === 'compras' && (
               <div>
                 <SectionHeader title="Compras do Mês" description="Toda compra alimenta automaticamente o estoque central." />
+                {editingCompraId && (
+                  <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900">
+                    Editando uma compra existente. Altere os campos abaixo e salve as alterações.
+                  </div>
+                )}
                 <div className="mt-6 grid gap-4 md:grid-cols-5">
                   <Field value={novaCompra.item} onChange={(value) => setNovaCompra((current) => ({ ...current, item: value }))} placeholder="Item" />
                   <Field type="number" value={novaCompra.quantidade} onChange={(value) => setNovaCompra((current) => ({ ...current, quantidade: value }))} placeholder="Quantidade" />
                   <Field type="number" value={novaCompra.valor} onChange={(value) => setNovaCompra((current) => ({ ...current, valor: value }))} placeholder="Valor" />
                   <Field type="month" value={novaCompra.mes} onChange={(value) => setNovaCompra((current) => ({ ...current, mes: value }))} />
-                  <PrimaryButton icon={PlusCircle} onClick={adicionarCompra} disabled={loading} label="Adicionar" />
+                  <PrimaryButton icon={editingCompraId ? Pencil : PlusCircle} onClick={adicionarCompra} disabled={loading} label={editingCompraId ? 'Salvar alterações' : 'Adicionar'} />
                 </div>
+                {editingCompraId && (
+                  <div className="mt-3">
+                    <SecondaryTextButton onClick={cancelarEdicaoCompra} label="Cancelar edição" />
+                  </div>
+                )}
                 <FilterMonth value={mesFiltroCompras} onChange={setMesFiltroCompras} />
                 <DataTable
                   headers={['Item', 'Quantidade', 'Valor', 'Mês', 'Ações']}
@@ -1468,7 +1436,7 @@ const FinanceApp = () => {
                     compra.mes,
                     isAdmin ? (
                       <div key={`actions-compra-${compra.id}`} className="flex items-center gap-3">
-                        <SecondaryTextButton onClick={() => editarCompra(compra)} label="Editar" />
+                        <SecondaryTextButton onClick={() => iniciarEdicaoCompra(compra)} label="Editar" />
                         <DangerTextButton onClick={() => excluirRegistro(`/compras/${compra.id}`, 'Compra excluída com sucesso')} label="Excluir" />
                       </div>
                     ) : (
@@ -1483,6 +1451,11 @@ const FinanceApp = () => {
             {activeTab === 'contas' && (
               <div>
                 <SectionHeader title="Contas Fixas" description="Registro mensal consolidado por categoria." />
+                {editingContaId && (
+                  <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900">
+                    Editando uma conta fixa. Altere os campos abaixo e salve as alterações.
+                  </div>
+                )}
                 <div className="mt-6 grid gap-4 md:grid-cols-4">
                   <select
                     value={novaConta.tipo}
@@ -1496,8 +1469,13 @@ const FinanceApp = () => {
                   </select>
                   <Field type="number" value={novaConta.valor} onChange={(value) => setNovaConta((current) => ({ ...current, valor: value }))} placeholder="Valor" />
                   <Field type="month" value={novaConta.mes} onChange={(value) => setNovaConta((current) => ({ ...current, mes: value }))} />
-                  <PrimaryButton icon={PlusCircle} onClick={adicionarConta} disabled={loading || categoriasConta.length === 0} label="Adicionar" />
+                  <PrimaryButton icon={editingContaId ? Pencil : PlusCircle} onClick={adicionarConta} disabled={loading || categoriasConta.length === 0} label={editingContaId ? 'Salvar alterações' : 'Adicionar'} />
                 </div>
+                {editingContaId && (
+                  <div className="mt-3">
+                    <SecondaryTextButton onClick={cancelarEdicaoConta} label="Cancelar edição" />
+                  </div>
+                )}
                 <FilterMonth value={mesFiltroContas} onChange={setMesFiltroContas} />
                 <DataTable
                   headers={['Tipo', 'Valor', 'Mês', 'Ações']}
@@ -1507,7 +1485,7 @@ const FinanceApp = () => {
                     conta.mes,
                     isAdmin ? (
                       <div key={`actions-conta-${conta.id}`} className="flex items-center gap-3">
-                        <SecondaryTextButton onClick={() => editarConta(conta)} label="Editar" />
+                        <SecondaryTextButton onClick={() => iniciarEdicaoConta(conta)} label="Editar" />
                         <DangerTextButton onClick={() => excluirRegistro(`/contas/${conta.id}`, 'Conta excluída com sucesso')} label="Excluir" />
                       </div>
                     ) : (
@@ -1522,12 +1500,22 @@ const FinanceApp = () => {
             {activeTab === 'lazer' && (
               <div>
                 <SectionHeader title="Despesas de Lazer" description="Controle mensal dos gastos com lazer e entretenimento." />
+                {editingLazerId && (
+                  <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900">
+                    Editando uma despesa de lazer. Altere os campos abaixo e salve as alterações.
+                  </div>
+                )}
                 <div className="mt-6 grid gap-4 md:grid-cols-4">
                   <Field value={novoLazer.descricao} onChange={(value) => setNovoLazer((current) => ({ ...current, descricao: value }))} placeholder="Descrição" />
                   <Field type="number" value={novoLazer.valor} onChange={(value) => setNovoLazer((current) => ({ ...current, valor: value }))} placeholder="Valor" />
                   <Field type="month" value={novoLazer.mes} onChange={(value) => setNovoLazer((current) => ({ ...current, mes: value }))} />
-                  <PrimaryButton icon={PlusCircle} onClick={adicionarLazer} disabled={loading} label="Adicionar" />
+                  <PrimaryButton icon={editingLazerId ? Pencil : PlusCircle} onClick={adicionarLazer} disabled={loading} label={editingLazerId ? 'Salvar alterações' : 'Adicionar'} />
                 </div>
+                {editingLazerId && (
+                  <div className="mt-3">
+                    <SecondaryTextButton onClick={cancelarEdicaoLazer} label="Cancelar edição" />
+                  </div>
+                )}
                 <FilterMonth value={mesFiltroLazer} onChange={setMesFiltroLazer} />
                 <DataTable
                   headers={['Descrição', 'Valor', 'Mês', 'Ações']}
@@ -1537,7 +1525,7 @@ const FinanceApp = () => {
                     item.mes,
                     isAdmin ? (
                       <div key={`actions-lazer-${item.id}`} className="flex items-center gap-3">
-                        <SecondaryTextButton onClick={() => editarLazer(item)} label="Editar" />
+                        <SecondaryTextButton onClick={() => iniciarEdicaoLazer(item)} label="Editar" />
                         <DangerTextButton onClick={() => excluirRegistro(`/lazer/${item.id}`, 'Despesa de lazer excluída com sucesso')} label="Excluir" />
                       </div>
                     ) : (
@@ -1552,12 +1540,22 @@ const FinanceApp = () => {
             {activeTab === 'manutencoes' && (
               <div>
                 <SectionHeader title="Extraordinárias" description="Custos ocasionais separados das contas fixas." />
+                {editingManutencaoId && (
+                  <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900">
+                    Editando uma despesa extraordinária. Altere os campos abaixo e salve as alterações.
+                  </div>
+                )}
                 <div className="mt-6 grid gap-4 md:grid-cols-4">
                   <Field value={novaManutencao.descricao} onChange={(value) => setNovaManutencao((current) => ({ ...current, descricao: value }))} placeholder="Descrição" />
                   <Field type="number" value={novaManutencao.valor} onChange={(value) => setNovaManutencao((current) => ({ ...current, valor: value }))} placeholder="Valor" />
                   <Field type="date" value={novaManutencao.data} onChange={(value) => setNovaManutencao((current) => ({ ...current, data: value }))} />
-                  <PrimaryButton icon={PlusCircle} onClick={adicionarManutencao} disabled={loading} label="Adicionar" />
+                  <PrimaryButton icon={editingManutencaoId ? Pencil : PlusCircle} onClick={adicionarManutencao} disabled={loading} label={editingManutencaoId ? 'Salvar alterações' : 'Adicionar'} />
                 </div>
+                {editingManutencaoId && (
+                  <div className="mt-3">
+                    <SecondaryTextButton onClick={cancelarEdicaoManutencao} label="Cancelar edição" />
+                  </div>
+                )}
                 <FilterMonth value={mesFiltroManutencoes} onChange={setMesFiltroManutencoes} />
                 <DataTable
                   headers={['Descrição', 'Valor', 'Data', 'Ações']}
@@ -1567,7 +1565,7 @@ const FinanceApp = () => {
                     new Date(manutencao.data).toLocaleDateString('pt-BR'),
                     isAdmin ? (
                       <div key={`actions-manutencao-${manutencao.id}`} className="flex items-center gap-3">
-                        <SecondaryTextButton onClick={() => editarManutencao(manutencao)} label="Editar" />
+                        <SecondaryTextButton onClick={() => iniciarEdicaoManutencao(manutencao)} label="Editar" />
                         <DangerTextButton onClick={() => excluirRegistro(`/manutencoes/${manutencao.id}`, 'Despesa extraordinária excluída com sucesso')} label="Excluir" />
                       </div>
                     ) : (
@@ -1582,6 +1580,11 @@ const FinanceApp = () => {
             {activeTab === 'investimentos' && (
               <div>
                 <SectionHeader title="Investimentos" description="Aportes mensais de investimentos e reservas." />
+                {editingInvestimentoId && (
+                  <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900">
+                    Editando um investimento. Altere os campos abaixo e salve as alterações.
+                  </div>
+                )}
                 <div className="mt-6 space-y-4">
                   <div className="grid gap-4 md:grid-cols-4">
                     <select
@@ -1596,10 +1599,15 @@ const FinanceApp = () => {
                     </select>
                     <Field type="number" value={novoInvestimento.valor} onChange={(value) => setNovoInvestimento((current) => ({ ...current, valor: value }))} placeholder="Valor" />
                     <Field type="month" value={novoInvestimento.mes} onChange={(value) => setNovoInvestimento((current) => ({ ...current, mes: value }))} />
-                    <PrimaryButton icon={PlusCircle} onClick={adicionarInvestimento} disabled={loading || categoriasInvestimento.length === 0} label="Adicionar" />
+                    <PrimaryButton icon={editingInvestimentoId ? Pencil : PlusCircle} onClick={adicionarInvestimento} disabled={loading || categoriasInvestimento.length === 0} label={editingInvestimentoId ? 'Salvar alterações' : 'Adicionar'} />
                   </div>
                   <Field value={novoInvestimento.nota} onChange={(value) => setNovoInvestimento((current) => ({ ...current, nota: value }))} placeholder="Descrição (opcional)" />
                 </div>
+                {editingInvestimentoId && (
+                  <div className="mt-3">
+                    <SecondaryTextButton onClick={cancelarEdicaoInvestimento} label="Cancelar edição" />
+                  </div>
+                )}
                 <FilterMonth value={mesFiltroInvestimentos} onChange={setMesFiltroInvestimentos} />
                 <DataTable
                   headers={['Categoria', 'Valor', 'Descrição', 'Mês', 'Ações']}
@@ -1610,7 +1618,7 @@ const FinanceApp = () => {
                     investimento.mes,
                     isAdmin ? (
                       <div key={`actions-investimento-${investimento.id}`} className="flex items-center gap-3">
-                        <SecondaryTextButton onClick={() => editarInvestimento(investimento)} label="Editar" />
+                        <SecondaryTextButton onClick={() => iniciarEdicaoInvestimento(investimento)} label="Editar" />
                         <DangerTextButton onClick={() => excluirRegistro(`/investimentos/${investimento.id}`, 'Investimento excluído com sucesso')} label="Excluir" />
                       </div>
                     ) : (
