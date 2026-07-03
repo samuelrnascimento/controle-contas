@@ -1256,7 +1256,7 @@ const FinanceApp = () => {
                   </select>
                   <Field type="number" value={novaConta.valor} onChange={(value) => setNovaConta((current) => ({ ...current, valor: value }))} placeholder="Valor" />
                   <Field type="month" value={novaConta.mes} onChange={(value) => setNovaConta((current) => ({ ...current, mes: value }))} />
-                  <PrimaryButton icon={PlusCircle} onClick={adicionarConta} disabled={loading} label="Adicionar" />
+                  <PrimaryButton icon={PlusCircle} onClick={adicionarConta} disabled={loading || categoriasConta.length === 0} label="Adicionar" />
                 </div>
                 <FilterMonth value={mesFiltroContas} onChange={setMesFiltroContas} />
                 <DataTable
@@ -1319,7 +1319,7 @@ const FinanceApp = () => {
                   </select>
                   <Field type="number" value={novoInvestimento.valor} onChange={(value) => setNovoInvestimento((current) => ({ ...current, valor: value }))} placeholder="Valor" />
                   <Field type="month" value={novoInvestimento.mes} onChange={(value) => setNovoInvestimento((current) => ({ ...current, mes: value }))} />
-                  <PrimaryButton icon={PlusCircle} onClick={adicionarInvestimento} disabled={loading} label="Adicionar" />
+                  <PrimaryButton icon={PlusCircle} onClick={adicionarInvestimento} disabled={loading || categoriasInvestimento.length === 0} label="Adicionar" />
                 </div>
                 <FilterMonth value={mesFiltroInvestimentos} onChange={setMesFiltroInvestimentos} />
                 <DataTable
