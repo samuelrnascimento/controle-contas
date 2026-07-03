@@ -1456,62 +1456,32 @@ const FinanceApp = () => {
         <header className="relative mb-6 overflow-hidden rounded-[36px] bg-[linear-gradient(135deg,#020617_0%,#0f172a_52%,#123047_100%)] text-white shadow-[0_24px_90px_rgba(15,23,42,0.35)]">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.18),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(56,189,248,0.14),transparent_26%)]" />
 
-          <div className="relative grid gap-8 px-8 py-8 lg:grid-cols-[1.15fr_0.85fr] lg:px-10">
-            <div className="rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur">
+          <div className="relative flex flex-col gap-6 px-8 py-8 lg:flex-row lg:items-start lg:justify-between lg:px-10">
+            <div className="flex-1 rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur">
               <p className="text-sm uppercase tracking-[0.32em] text-emerald-300">Finansam Control Center</p>
               <h1 className="mt-3 max-w-3xl text-4xl font-black tracking-tight text-white">Plataforma Administrativa com visão operacional, financeira e governança por acesso.</h1>
               <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-300">
                 Centralize lançamentos, usuários, categorias, estoque e relatórios em um ambiente único, com separação entre tenant e plataforma e leitura executiva da operação.
               </p>
-
-              <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-4">
-                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-200">Escopo</p>
-                  <p className="mt-2 text-lg font-black text-white">{isPlatformAdmin ? 'Plataforma' : 'Tenant'}</p>
-                </div>
-                <div className="rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-4">
-                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-sky-200">Perfil</p>
-                  <p className="mt-2 text-lg font-black text-white">{isPlatformAdmin ? 'Super Admin' : isAdmin ? 'Admin' : 'Operacional'}</p>
-                </div>
-                <div className="rounded-2xl border border-white/10 bg-white/8 px-4 py-4">
-                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-300">Status</p>
-                  <p className="mt-2 text-lg font-black text-emerald-300">Sessão ativa</p>
-                </div>
-              </div>
             </div>
 
-            <div className="grid gap-4">
-              <div className="rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Usuário ativo</p>
-                  <p className="mt-2 text-2xl font-bold text-white">{user.name}</p>
-                  <p className="text-sm text-slate-300">{user.email}</p>
-                </div>
-                <div className="mt-5 flex flex-wrap items-center gap-3">
-                  <span className={`rounded-full px-3 py-1 text-sm font-semibold ${isAdmin ? 'bg-emerald-400/15 text-emerald-200' : 'bg-sky-400/15 text-sky-200'}`}>
-                    {isPlatformAdmin ? 'Super Admin da Plataforma' : isAdmin ? 'Proprietário / Admin' : 'Usuário operacional'}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={handleLogout}
-                    className="inline-flex items-center gap-2 rounded-full border border-white/15 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
-                  >
-                    <LogOut size={16} /> Sair
-                  </button>
-                </div>
+            <div className="w-full rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur lg:max-w-sm">
+              <div>
+                <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Usuário ativo</p>
+                <p className="mt-2 text-2xl font-bold text-white">{user.name}</p>
+                <p className="text-sm text-slate-300">{user.email}</p>
               </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4 backdrop-blur">
-                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Operação</p>
-                  <p className="mt-2 text-lg font-black text-white">Gestão centralizada</p>
-                  <p className="mt-1 text-sm text-slate-300">Dados persistidos e acesso controlado por perfil.</p>
-                </div>
-                <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4 backdrop-blur">
-                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Arquitetura</p>
-                  <p className="mt-2 text-lg font-black text-white">Multi contexto</p>
-                  <p className="mt-1 text-sm text-slate-300">Tenant e plataforma operando com governança isolada.</p>
-                </div>
+              <div className="mt-5 flex flex-wrap items-center gap-3">
+                <span className={`rounded-full px-3 py-1 text-sm font-semibold ${isAdmin ? 'bg-emerald-400/15 text-emerald-200' : 'bg-sky-400/15 text-sky-200'}`}>
+                  {isPlatformAdmin ? 'Super Admin da Plataforma' : isAdmin ? 'Proprietário / Admin' : 'Usuário operacional'}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="inline-flex items-center gap-2 rounded-full border border-white/15 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
+                >
+                  <LogOut size={16} /> Sair
+                </button>
               </div>
             </div>
           </div>
