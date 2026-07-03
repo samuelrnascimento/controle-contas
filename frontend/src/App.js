@@ -644,7 +644,7 @@ const FinanceApp = () => {
         body: JSON.stringify(novaManutencao)
       });
       setNovaManutencao(emptyManutencao());
-    }, 'Manutenção adicionada com sucesso');
+    }, 'Despesa extraordinária adicionada com sucesso');
   };
 
   const adicionarInvestimento = async () => {
@@ -1083,7 +1083,7 @@ const FinanceApp = () => {
     { label: 'Contas', total: relatorio.totalContas, className: 'bg-emerald-500' },
     { label: 'Lazer', total: relatorio.totalLazer, className: 'bg-fuchsia-500' },
     { label: 'Investimentos', total: relatorio.totalInvestimentos, className: 'bg-indigo-500' },
-    { label: 'Manutenções', total: relatorio.totalManutencoes, className: 'bg-amber-500' }
+    { label: 'Extraordinárias', total: relatorio.totalManutencoes, className: 'bg-amber-500' }
   ];
 
   if (sessionLoading) {
@@ -1395,7 +1395,7 @@ const FinanceApp = () => {
                     formatCurrency(manutencao.valor),
                     new Date(manutencao.data).toLocaleDateString('pt-BR'),
                     isAdmin ? (
-                      <DangerTextButton key={`delete-manutencao-${manutencao.id}`} onClick={() => excluirRegistro(`/manutencoes/${manutencao.id}`, 'Manutenção excluída com sucesso')} label="Excluir" />
+                      <DangerTextButton key={`delete-manutencao-${manutencao.id}`} onClick={() => excluirRegistro(`/manutencoes/${manutencao.id}`, 'Despesa extraordinária excluída com sucesso')} label="Excluir" />
                     ) : (
                       <span key={`readonly-manutencao-${manutencao.id}`} className="text-sm text-slate-400">Somente admin exclui</span>
                     )
@@ -1486,7 +1486,7 @@ const FinanceApp = () => {
                   <MetricCard title="Contas" value={formatCurrency(relatorio.totalContas)} tone="bg-emerald-100 text-emerald-900" />
                   <MetricCard title="Lazer" value={formatCurrency(relatorio.totalLazer)} tone="bg-fuchsia-100 text-fuchsia-900" />
                   <MetricCard title="Investimentos" value={formatCurrency(relatorio.totalInvestimentos)} tone="bg-indigo-100 text-indigo-900" />
-                  <MetricCard title="Manutenções" value={formatCurrency(relatorio.totalManutencoes)} tone="bg-amber-100 text-amber-900" />
+                  <MetricCard title="Extraordinárias" value={formatCurrency(relatorio.totalManutencoes)} tone="bg-amber-100 text-amber-900" />
                   <MetricCard title="Total Geral" value={formatCurrency(relatorio.totalGeral)} tone="bg-rose-100 text-rose-900" />
                 </div>
 
@@ -1564,7 +1564,7 @@ const FinanceApp = () => {
                       <li>Antes, o frontend persistia tudo em localStorage. Isso impedia governança central, auditoria e acesso por múltiplos usuários.</li>
                       <li>Agora, login e autorização passam pelo backend, com token JWT e dados persistidos no PostgreSQL.</li>
                       <li>Existe exatamente um administrador proprietário. Usuários adicionais são sempre operacionais.</li>
-                      <li>Exclusões de compras, contas e manutenções ficam restritas ao proprietário para reduzir risco operacional.</li>
+                      <li>Exclusões de compras, contas e extraordinárias ficam restritas ao proprietário para reduzir risco operacional.</li>
                       <li>Os registros antigos em localStorage não são migrados automaticamente. Se houver dados no navegador antigo, eles precisam ser importados manualmente.</li>
                     </ul>
                   </div>
@@ -2100,7 +2100,7 @@ const FinanceApp = () => {
               <div className="mt-4 space-y-4">
                 {!isPlatformAdmin && <SummaryRow label="Contas cadastradas" value={String(contas.length)} />}
                 {!isPlatformAdmin && <SummaryRow label="Investimentos" value={String(investimentos.length)} />}
-                {!isPlatformAdmin && <SummaryRow label="Manutenções" value={String(manutencoes.length)} />}
+                {!isPlatformAdmin && <SummaryRow label="Extraordinárias" value={String(manutencoes.length)} />}
                 {!isPlatformAdmin && <SummaryRow label="Itens em estoque" value={String(estoque.length)} />}
                 {isAdmin && <SummaryRow label="Usuários ativos" value={String(usuarios.filter((registeredUser) => registeredUser.active).length)} />}
                 {isPlatformAdmin && <SummaryRow label="Tenants" value={String(platformTenants.length)} />}

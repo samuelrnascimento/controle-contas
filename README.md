@@ -12,8 +12,8 @@ O projeto agora cobre os três pontos pedidos:
 
 ## Papéis e permissões
 
-- `admin`: proprietário da ferramenta. Pode acessar o portal administrativo, gerenciar usuários e excluir compras, contas e manutenções.
-- `user`: usuário operacional. Pode criar compras, contas, manutenções e registrar baixa de estoque.
+- `admin`: proprietário da ferramenta. Pode acessar o portal administrativo, gerenciar usuários e excluir compras, contas e extraordinárias.
+- `user`: usuário operacional. Pode criar compras, contas, extraordinárias e registrar baixa de estoque.
 
 ### Administração global da plataforma
 
@@ -109,5 +109,5 @@ Pesos tipográficos utilizados: `font-black` (900) em títulos de impacto; `font
 | Sky | `sky` | `#0ea5e9` | **Acento secundário** — perfil operacional, labels de usuário comum |
 | Blue | `blue` | `#3b82f6` | Categoria **Compras** (cards e gráficos) |
 | Indigo | `indigo` | `#6366f1` | Categoria **Investimentos** |
-| Amber | `amber` | `#f59e0b` | Categoria **Manutenções**, estoque, avisos |
+| Amber | `amber` | `#f59e0b` | Categoria **Extraordinárias**, estoque, avisos |
 | Rose | `rose` | `#f43f5e` | **Erros**, alertas, ações destrutivas, Total Geral, usuário inativo |
