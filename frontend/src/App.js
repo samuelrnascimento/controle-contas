@@ -38,7 +38,7 @@ const defaultDate = new Date().toISOString().slice(0, 10);
 
 const emptyCompra = () => ({ item: '', quantidade: '', valor: '', mes: defaultMonth });
 const emptyConta = () => ({ tipo: '', valor: '', mes: defaultMonth });
-const emptyEntrada = () => ({ tipo: '', valor: '', mes: defaultMonth });
+const emptyEntrada = () => ({ tipo: '', valor: '', mes: defaultMonth, nota: '' });
 const emptyLazer = () => ({ descricao: '', valor: '', mes: defaultMonth });
 const emptyManutencao = () => ({ descricao: '', valor: '', data: defaultDate });
 const emptyInvestimento = () => ({ descricao: '', valor: '', mes: defaultMonth, nota: '' });
@@ -812,7 +812,12 @@ const FinanceApp = () => {
   const iniciarEdicaoEntrada = (entrada) => {
     setActiveTab('entradas');
     setEditingEntradaId(entrada.id);
-    setNovaEntrada({ tipo: entrada.tipo || '', valor: String(entrada.valor ?? ''), mes: entrada.mes || defaultMonth });
+    setNovaEntrada({
+      tipo: entrada.tipo || '',
+      valor: String(entrada.valor ?? ''),
+      mes: entrada.mes || defaultMonth,
+      nota: entrada.nota || ''
+    });
     clearMessages();
   };
 
@@ -1679,20 +1684,23 @@ const FinanceApp = () => {
                     Editando uma entrada financeira. Altere os campos abaixo e salve as alterações.
                   </div>
                 )}
-                <div className="mt-6 grid gap-4 md:grid-cols-4">
-                  <select
-                    value={novaEntrada.tipo}
-                    onChange={(event) => setNovaEntrada((current) => ({ ...current, tipo: event.target.value }))}
-                    className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
-                  >
-                    {categoriasEntrada.length === 0 && <option value="">Cadastre categorias na aba Categorias</option>}
-                    {categoriasEntrada.map((categoria) => (
-                      <option key={categoria} value={categoria}>{categoria}</option>
-                    ))}
-                  </select>
-                  <Field type="number" value={novaEntrada.valor} onChange={(value) => setNovaEntrada((current) => ({ ...current, valor: value }))} placeholder="Valor" />
-                  <Field type="month" value={novaEntrada.mes} onChange={(value) => setNovaEntrada((current) => ({ ...current, mes: value }))} />
-                  <PrimaryButton icon={editingEntradaId ? Pencil : PlusCircle} onClick={adicionarEntrada} disabled={loading || categoriasEntrada.length === 0} label={editingEntradaId ? 'Salvar alterações' : 'Adicionar'} />
+                <div className="mt-6 space-y-4">
+                  <div className="grid gap-4 md:grid-cols-4">
+                    <select
+                      value={novaEntrada.tipo}
+                      onChange={(event) => setNovaEntrada((current) => ({ ...current, tipo: event.target.value }))}
+                      className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                    >
+                      {categoriasEntrada.length === 0 && <option value="">Cadastre categorias na aba Categorias</option>}
+                      {categoriasEntrada.map((categoria) => (
+                        <option key={categoria} value={categoria}>{categoria}</option>
+                      ))}
+                    </select>
+                    <Field type="number" value={novaEntrada.valor} onChange={(value) => setNovaEntrada((current) => ({ ...current, valor: value }))} placeholder="Valor" />
+                    <Field type="month" value={novaEntrada.mes} onChange={(value) => setNovaEntrada((current) => ({ ...current, mes: value }))} />
+                    <PrimaryButton icon={editingEntradaId ? Pencil : PlusCircle} onClick={adicionarEntrada} disabled={loading || categoriasEntrada.length === 0} label={editingEntradaId ? 'Salvar alterações' : 'Adicionar'} />
+                  </div>
+                  <Field value={novaEntrada.nota} onChange={(value) => setNovaEntrada((current) => ({ ...current, nota: value }))} placeholder="Nota (opcional)" />
                 </div>
                 {editingEntradaId && (
                   <div className="mt-3">
@@ -1701,10 +1709,11 @@ const FinanceApp = () => {
                 )}
                 <FilterMonth value={mesFiltroEntradas} onChange={setMesFiltroEntradas} />
                 <DataTable
-                  headers={['Categoria', 'Valor', 'Mês', 'Ações']}
+                  headers={['Categoria', 'Valor', 'Nota', 'Mês', 'Ações']}
                   rows={entradas.filter((entrada) => entrada.mes === mesFiltroEntradas).map((entrada) => [
                     entrada.tipo,
                     formatCurrency(entrada.valor),
+                    entrada.nota || '-',
                     entrada.mes,
                     isAdmin ? (
                       <div key={`actions-entrada-${entrada.id}`} className="flex items-center gap-3">

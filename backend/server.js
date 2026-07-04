@@ -286,12 +286,14 @@ const ensureSchema = async () => {
       id SERIAL PRIMARY KEY,
       tipo VARCHAR(120) NOT NULL,
       valor DECIMAL(10, 2) NOT NULL,
+      nota TEXT,
       mes VARCHAR(7) NOT NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
     ALTER TABLE entradas ADD COLUMN IF NOT EXISTS tenant_id TEXT;
     ALTER TABLE entradas ALTER COLUMN tenant_id TYPE TEXT USING tenant_id::text;
+    ALTER TABLE entradas ADD COLUMN IF NOT EXISTS nota TEXT;
 
     CREATE TABLE IF NOT EXISTS lazer (
       id SERIAL PRIMARY KEY,
@@ -1272,7 +1274,7 @@ app.get('/api/entradas', authenticateToken, requireTenantScope, async (req, res)
 });
 
 app.post('/api/entradas', authenticateToken, requireTenantScope, async (req, res) => {
-  const { tipo, valor, mes } = req.body;
+  const { tipo, valor, mes, nota } = req.body;
   const valorNumerico = parseAmount(valor);
 
   if (!tipo || !mes || valorNumerico === null) {
@@ -1282,12 +1284,12 @@ app.post('/api/entradas', authenticateToken, requireTenantScope, async (req, res
   try {
     const result = runtimeCapabilities.hasEntradasTenantId
       ? await pool.query(
-        'INSERT INTO entradas (tenant_id, tipo, valor, mes) VALUES ($1, $2, $3, $4) RETURNING *',
-        [req.user.tenant_id, tipo, valorNumerico, mes]
+        'INSERT INTO entradas (tenant_id, tipo, valor, mes, nota) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+        [req.user.tenant_id, tipo, valorNumerico, mes, nota || null]
       )
       : await pool.query(
-        'INSERT INTO entradas (tipo, valor, mes) VALUES ($1, $2, $3) RETURNING *',
-        [tipo, valorNumerico, mes]
+        'INSERT INTO entradas (tipo, valor, mes, nota) VALUES ($1, $2, $3, $4) RETURNING *',
+        [tipo, valorNumerico, mes, nota || null]
       );
 
     res.status(201).json(result.rows[0]);
@@ -1297,7 +1299,7 @@ app.post('/api/entradas', authenticateToken, requireTenantScope, async (req, res
 });
 
 app.patch('/api/entradas/:id', authenticateToken, requireTenantScope, requireRole('admin'), async (req, res) => {
-  const { tipo, valor, mes } = req.body;
+  const { tipo, valor, mes, nota } = req.body;
   const valorNumerico = parseAmount(valor);
 
   if (!tipo || !mes || valorNumerico === null) {
@@ -1308,17 +1310,17 @@ app.patch('/api/entradas/:id', authenticateToken, requireTenantScope, requireRol
     const result = runtimeCapabilities.hasEntradasTenantId
       ? await pool.query(
         `UPDATE entradas
-         SET tipo = $1, valor = $2, mes = $3
-         WHERE id::text = $4 AND tenant_id = $5
+         SET tipo = $1, valor = $2, mes = $3, nota = $4
+         WHERE id::text = $5 AND tenant_id = $6
          RETURNING *`,
-        [tipo, valorNumerico, mes, req.params.id, req.user.tenant_id]
+        [tipo, valorNumerico, mes, nota || null, req.params.id, req.user.tenant_id]
       )
       : await pool.query(
         `UPDATE entradas
-         SET tipo = $1, valor = $2, mes = $3
-         WHERE id::text = $4
+         SET tipo = $1, valor = $2, mes = $3, nota = $4
+         WHERE id::text = $5
          RETURNING *`,
-        [tipo, valorNumerico, mes, req.params.id]
+        [tipo, valorNumerico, mes, nota || null, req.params.id]
       );
 
     if (result.rows.length === 0) {
