@@ -1,9 +1,12 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle,
   BarChart3,
   Building2,
+  CalendarDays,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   DollarSign,
   Gamepad2,
   Landmark,
@@ -288,6 +291,123 @@ const getNextMonth = (monthStr) => {
   return `${year}-${String(month + 1).padStart(2, '0')}`;
 };
 
+const monthShortLabels = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+const monthLongLabels = ['janeiro', 'fevereiro', 'marco', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+
+const parseMonthValue = (monthStr) => {
+  const fallbackYear = Number(defaultMonth.slice(0, 4));
+  const fallbackMonth = Number(defaultMonth.slice(5, 7));
+
+  if (!/^\d{4}-\d{2}$/.test(String(monthStr || ''))) {
+    return { year: fallbackYear, month: fallbackMonth };
+  }
+
+  const [year, month] = monthStr.split('-').map(Number);
+  return { year, month };
+};
+
+const formatMonthLongLabel = (monthStr) => {
+  const { year, month } = parseMonthValue(monthStr);
+  return `${monthLongLabels[month - 1]} de ${year}`;
+};
+
+const MonthPicker = ({ value, onChange }) => {
+  const [open, setOpen] = useState(false);
+  const pickerRef = useRef(null);
+  const { year: selectedYear, month: selectedMonth } = parseMonthValue(value);
+  const [displayYear, setDisplayYear] = useState(selectedYear);
+
+  useEffect(() => {
+    setDisplayYear(selectedYear);
+  }, [selectedYear]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (!pickerRef.current || pickerRef.current.contains(event.target)) {
+        return;
+      }
+
+      setOpen(false);
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  return (
+    <div ref={pickerRef} className="relative flex-1">
+      <button
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-slate-800 shadow-[0_8px_20px_rgba(15,23,42,0.06)] transition hover:border-slate-300"
+      >
+        <span className="font-medium capitalize">{formatMonthLongLabel(value)}</span>
+        <CalendarDays size={18} className="text-slate-500" />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-full z-30 mt-2 w-full min-w-[280px] rounded-2xl border border-slate-200 bg-white p-3 shadow-[0_20px_45px_rgba(15,23,42,0.18)]">
+          <div className="mb-3 flex items-center justify-between rounded-xl bg-slate-50 px-2 py-2">
+            <button
+              type="button"
+              onClick={() => setDisplayYear((current) => current - 1)}
+              className="rounded-lg p-2 text-slate-600 transition hover:bg-slate-200"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <span className="text-sm font-bold text-slate-800">{displayYear}</span>
+            <button
+              type="button"
+              onClick={() => setDisplayYear((current) => current + 1)}
+              className="rounded-lg p-2 text-slate-600 transition hover:bg-slate-200"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-4 gap-2">
+            {monthShortLabels.map((label, monthIndex) => {
+              const monthNumber = monthIndex + 1;
+              const monthValue = `${displayYear}-${String(monthNumber).padStart(2, '0')}`;
+              const isActive = displayYear === selectedYear && monthNumber === selectedMonth;
+
+              return (
+                <button
+                  key={monthValue}
+                  type="button"
+                  onClick={() => {
+                    onChange(monthValue);
+                    setOpen(false);
+                  }}
+                  className={`rounded-lg px-2 py-2 text-sm font-semibold uppercase transition ${isActive ? 'bg-slate-900 text-white shadow-[0_8px_20px_rgba(15,23,42,0.25)]' : 'bg-slate-50 text-slate-700 hover:bg-slate-100'}`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="mt-3 flex justify-end">
+            <button
+              type="button"
+              onClick={() => {
+                onChange(defaultMonth);
+                setOpen(false);
+              }}
+              className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+            >
+              Ir para mes atual
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const FilterMonth = ({ value, onChange }) => (
   <div className="mt-6 w-full">
     <label className="mb-2 block text-sm font-semibold text-slate-700">Filtrar por mês</label>
@@ -299,7 +419,7 @@ const FilterMonth = ({ value, onChange }) => (
       >
         ← Anterior
       </button>
-      <Field type="month" value={value} onChange={onChange} />
+      <MonthPicker value={value} onChange={onChange} />
       <button
         type="button"
         onClick={() => onChange(getNextMonth(value))}
