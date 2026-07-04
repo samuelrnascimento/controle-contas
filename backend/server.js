@@ -117,6 +117,11 @@ const sanitizeUser = (user) => ({
   active: isUserActive(user),
   scope: 'tenant',
   tenantId: user.tenant_id || null,
+  tenantName: user.tenant_name || null,
+  tenantSlug: user.tenant_slug || null,
+  tenantPlan: normalizeTenantPlan(user.tenant_plan || user.plan) || null,
+  tenantSubscriptionStatus: normalizeTenantStatus(user.subscription_status) || null,
+  tenantTrialExpiresAt: user.trial_expires_at || null,
   createdAt: user.created_at
 });
 
@@ -724,7 +729,7 @@ app.post('/api/auth/signup', async (req, res) => {
   const firstName = String(req.body?.firstName || '').trim();
   const lastName = String(req.body?.lastName || '').trim();
   const company = String(req.body?.company || '').trim();
-  const plan = normalizeTenantPlan(req.body?.plan || 'Starter');
+  const signupTenantPlan = 'Starter';
   const phone = String(req.body?.phone || '').trim();
   const email = String(req.body?.email || '').trim().toLowerCase();
   const adminEmail = String(req.body?.adminEmail || email || '').trim().toLowerCase();
@@ -733,8 +738,8 @@ app.post('/api/auth/signup', async (req, res) => {
   const tenantName = company || ownerName;
   const tenantSlug = normalizeTenantSlug(company || ownerName || email.split('@')[0]);
 
-  if (!firstName || !plan || !phone || !email || !adminEmail || !adminPassword) {
-    return res.status(400).json({ error: 'Preencha nome, plano, telefone, e-mail e credenciais do admin' });
+  if (!firstName || !phone || !email || !adminEmail || !adminPassword) {
+    return res.status(400).json({ error: 'Preencha nome, telefone, e-mail e credenciais do admin' });
   }
 
   if (!tenantName || !tenantSlug) {
@@ -754,7 +759,7 @@ app.post('/api/auth/signup', async (req, res) => {
       `INSERT INTO tenants (name, slug, plan, subscription_status, trial_expires_at)
        VALUES ($1, $2, $3, 'trial', $4)
        RETURNING id, name, slug, plan, subscription_status, trial_expires_at, created_at`,
-      [tenantName, tenantSlug, plan, addDays(7)]
+      [tenantName, tenantSlug, signupTenantPlan, addDays(7)]
     );
 
     const tenant = tenantResult.rows[0];
@@ -769,7 +774,14 @@ app.post('/api/auth/signup', async (req, res) => {
     await applyTenantUserStatus(client, tenant.id, 'trial');
     await client.query('COMMIT');
 
-    const createdAdmin = adminResult.rows[0];
+    const createdAdmin = {
+      ...adminResult.rows[0],
+      tenant_name: tenant.name,
+      tenant_slug: tenant.slug,
+      tenant_plan: tenant.plan,
+      subscription_status: tenant.subscription_status,
+      trial_expires_at: tenant.trial_expires_at
+    };
     return res.status(201).json({
       token: createTenantToken(createdAdmin),
       user: sanitizeUser(createdAdmin),

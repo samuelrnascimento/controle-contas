@@ -74,7 +74,6 @@ const emptyPublicSignupForm = () => ({
   firstName: '',
   lastName: '',
   company: '',
-  plan: 'Starter',
   phone: '',
   email: '',
   adminEmail: '',
@@ -123,6 +122,21 @@ const normalizeTenantStatus = (value) => {
   }
 
   return null;
+};
+
+const getTrialDaysRemaining = (trialExpiresAt) => {
+  if (!trialExpiresAt) {
+    return null;
+  }
+
+  const expiresAt = new Date(trialExpiresAt).getTime();
+
+  if (!Number.isFinite(expiresAt)) {
+    return null;
+  }
+
+  const remainingMs = expiresAt - Date.now();
+  return Math.max(0, Math.ceil(remainingMs / (24 * 60 * 60 * 1000)));
 };
 
 const readTenantViewPreferences = () => {
@@ -530,6 +544,13 @@ const FinanceApp = () => {
 
   const isPlatformAdmin = user?.scope === 'platform' || user?.role === 'super_admin';
   const isAdmin = !isPlatformAdmin && (user?.role === 'admin' || user?.role === 'owner');
+  const tenantPlan = normalizeTenantPlan(user?.tenantPlan || user?.tenant_plan || '');
+  const tenantSubscriptionStatus = normalizeTenantStatus(user?.tenantSubscriptionStatus || user?.subscription_status || '');
+  const trialDaysRemaining = getTrialDaysRemaining(user?.tenantTrialExpiresAt || user?.trial_expires_at);
+  const showTrialCountdown = !isPlatformAdmin
+    && tenantPlan === 'Starter'
+    && tenantSubscriptionStatus === 'trial'
+    && trialDaysRemaining !== null;
 
   const apiFetch = async (path, options = {}) => {
     const authToken = options.authToken ?? token;
@@ -1561,18 +1582,6 @@ const FinanceApp = () => {
                     />
                   </label>
                   <label className="block">
-                    <span className="mb-2 block text-sm font-semibold text-slate-700">Plano</span>
-                    <select
-                      value={publicSignupForm.plan}
-                      onChange={(event) => setPublicSignupForm((current) => ({ ...current, plan: event.target.value }))}
-                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-200"
-                    >
-                      {TENANT_PLANS.map((plan) => (
-                        <option key={plan} value={plan}>{plan}</option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="block">
                     <span className="mb-2 block text-sm font-semibold text-slate-700">Telefone</span>
                     <input
                       type="text"
@@ -1641,6 +1650,19 @@ const FinanceApp = () => {
                 <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Usuário ativo</p>
                 <p className="mt-2 text-2xl font-bold text-white">{user.name}</p>
                 <p className="text-sm text-slate-300">{user.email}</p>
+                {!isPlatformAdmin && (
+                  <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2">
+                    <p className="text-[11px] uppercase tracking-[0.2em] text-slate-400">Plano atual</p>
+                    <p className="mt-1 text-sm font-semibold text-emerald-200">{tenantPlan || 'Starter'}</p>
+                    {showTrialCountdown && (
+                      <p className="mt-1 text-xs text-slate-300">
+                        {trialDaysRemaining > 0
+                          ? `Restam ${trialDaysRemaining} dia(s) no trial Starter`
+                          : 'Trial Starter encerrado'}
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="mt-5 flex flex-wrap items-center gap-3">
                 <span className={`rounded-full px-3 py-1 text-sm font-semibold ${isAdmin ? 'bg-emerald-400/15 text-emerald-200' : 'bg-sky-400/15 text-sky-200'}`}>
