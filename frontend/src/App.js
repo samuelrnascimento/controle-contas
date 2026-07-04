@@ -1265,29 +1265,12 @@ const FinanceApp = () => {
       <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(34,197,94,0.18),_transparent_32%),linear-gradient(135deg,#07111f_0%,#10203b_55%,#1e293b_100%)] text-slate-100 px-6 py-10">
         <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[1.1fr_0.9fr]">
           <section className="rounded-[32px] border border-emerald-400/20 bg-white/5 p-8 shadow-[0_20px_80px_rgba(0,0,0,0.35)] backdrop-blur">
-            <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300/30 bg-emerald-400/10 px-4 py-2 text-sm font-medium text-emerald-100">
-              <Shield size={16} /> Plataforma protegida
-            </span>
-            <h1 className="mt-6 max-w-xl text-5xl font-black tracking-tight text-white">
+            <h1 className="max-w-xl text-5xl font-black tracking-tight text-white">
               Finansam com portal do proprietário, usuários e dados centralizados.
             </h1>
             <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-300">
               A aplicação deixou o modo local em navegador e passou a exigir autenticação real, com um único administrador dono da ferramenta e usuários operacionais separados.
             </p>
-            <div className="mt-8 grid gap-4 sm:grid-cols-3">
-              <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-4">
-                <p className="text-sm uppercase tracking-[0.22em] text-slate-400">Antes</p>
-                <p className="mt-2 text-sm text-slate-200">Sem login, sem perfis, dados em localStorage.</p>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-4">
-                <p className="text-sm uppercase tracking-[0.22em] text-slate-400">Agora</p>
-                <p className="mt-2 text-sm text-slate-200">JWT, PostgreSQL, permissões por papel e painel admin.</p>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-4">
-                <p className="text-sm uppercase tracking-[0.22em] text-slate-400">Admin</p>
-                <p className="mt-2 text-sm text-slate-200">Pode criar usuários, resetar senha e desativar contas.</p>
-              </div>
-            </div>
           </section>
 
           <section className="rounded-[32px] bg-[#f8f5ef] p-8 text-slate-900 shadow-[0_24px_90px_rgba(0,0,0,0.22)]">
@@ -1440,10 +1423,6 @@ const FinanceApp = () => {
                 <AlertCircle size={18} className="mt-0.5" /> {errorMessage}
               </div>
             )}
-
-            <div className="mt-8 rounded-2xl border border-dashed border-slate-300 bg-slate-100/60 p-4 text-sm text-slate-600">
-              Credenciais iniciais: defina ADMIN_EMAIL e ADMIN_PASSWORD no serviço backend do compose antes de produção.
-            </div>
           </section>
         </div>
       </div>
