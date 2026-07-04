@@ -28,6 +28,7 @@ const runtimeCapabilities = {
   hasUsersTenantId: false,
   hasComprasTenantId: false,
   hasContasTenantId: false,
+  hasEntradasTenantId: false,
   hasLazerTenantId: false,
   hasManutencoesTenantId: false,
   hasEstoqueTenantId: false,
@@ -37,7 +38,7 @@ const runtimeCapabilities = {
 
 const allowedTenantPlans = ['Starter', 'Smart', 'Premium'];
 const allowedTenantStatuses = ['active', 'inactive', 'trial'];
-const allowedCategoryScopes = ['contas', 'investimentos'];
+const allowedCategoryScopes = ['contas', 'investimentos', 'entradas'];
 
 const normalizeTenantPlan = (value) => {
   const normalized = String(value || '').trim().toLowerCase();
@@ -281,6 +282,17 @@ const ensureSchema = async () => {
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
+    CREATE TABLE IF NOT EXISTS entradas (
+      id SERIAL PRIMARY KEY,
+      tipo VARCHAR(120) NOT NULL,
+      valor DECIMAL(10, 2) NOT NULL,
+      mes VARCHAR(7) NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    ALTER TABLE entradas ADD COLUMN IF NOT EXISTS tenant_id TEXT;
+    ALTER TABLE entradas ALTER COLUMN tenant_id TYPE TEXT USING tenant_id::text;
+
     CREATE TABLE IF NOT EXISTS lazer (
       id SERIAL PRIMARY KEY,
       descricao TEXT NOT NULL,
@@ -332,6 +344,7 @@ const ensureSchema = async () => {
 
     CREATE INDEX IF NOT EXISTS idx_compras_mes ON compras(mes);
     CREATE INDEX IF NOT EXISTS idx_contas_mes ON contas(mes);
+    CREATE INDEX IF NOT EXISTS idx_entradas_mes ON entradas(mes);
     CREATE INDEX IF NOT EXISTS idx_lazer_mes ON lazer(mes);
     CREATE INDEX IF NOT EXISTS idx_manutencoes_data ON manutencoes(data);
     CREATE INDEX IF NOT EXISTS idx_investimentos_mes ON investimentos(mes);
@@ -401,6 +414,14 @@ const discoverCapabilities = async () => {
     ) AS has_contas_tenant_id`
   );
 
+  const entradasTenantResult = await pool.query(
+    `SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'entradas' AND column_name = 'tenant_id'
+    ) AS has_entradas_tenant_id`
+  );
+
   const manutencoesTenantResult = await pool.query(
     `SELECT EXISTS (
       SELECT 1
@@ -443,6 +464,8 @@ const discoverCapabilities = async () => {
 
   runtimeCapabilities.hasComprasTenantId = comprasTenantResult.rows[0]?.has_compras_tenant_id === true;
   runtimeCapabilities.hasContasTenantId = contasTenantResult.rows[0]?.has_contas_tenant_id === true;
+  runtimeCapabilities.hasEntradasTenantId = runtimeCapabilities.hasUsersTenantId
+    && entradasTenantResult.rows[0]?.has_entradas_tenant_id === true;
   runtimeCapabilities.hasLazerTenantId = runtimeCapabilities.hasUsersTenantId
     && lazerTenantResult.rows[0]?.has_lazer_tenant_id === true;
   runtimeCapabilities.hasManutencoesTenantId = manutencoesTenantResult.rows[0]?.has_manutencoes_tenant_id === true;
@@ -1233,6 +1256,92 @@ app.delete('/api/categories/:id', authenticateToken, requireTenantScope, require
     return res.json({ message: 'Categoria excluída com sucesso' });
   } catch (error) {
     return res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/entradas', authenticateToken, requireTenantScope, async (req, res) => {
+  try {
+    const result = runtimeCapabilities.hasEntradasTenantId
+      ? await pool.query('SELECT * FROM entradas WHERE tenant_id = $1 ORDER BY mes DESC, id DESC', [req.user.tenant_id])
+      : await pool.query('SELECT * FROM entradas ORDER BY mes DESC, id DESC');
+
+    res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/entradas', authenticateToken, requireTenantScope, async (req, res) => {
+  const { tipo, valor, mes } = req.body;
+  const valorNumerico = parseAmount(valor);
+
+  if (!tipo || !mes || valorNumerico === null) {
+    return res.status(400).json({ error: 'Dados de entrada inválidos' });
+  }
+
+  try {
+    const result = runtimeCapabilities.hasEntradasTenantId
+      ? await pool.query(
+        'INSERT INTO entradas (tenant_id, tipo, valor, mes) VALUES ($1, $2, $3, $4) RETURNING *',
+        [req.user.tenant_id, tipo, valorNumerico, mes]
+      )
+      : await pool.query(
+        'INSERT INTO entradas (tipo, valor, mes) VALUES ($1, $2, $3) RETURNING *',
+        [tipo, valorNumerico, mes]
+      );
+
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.patch('/api/entradas/:id', authenticateToken, requireTenantScope, requireRole('admin'), async (req, res) => {
+  const { tipo, valor, mes } = req.body;
+  const valorNumerico = parseAmount(valor);
+
+  if (!tipo || !mes || valorNumerico === null) {
+    return res.status(400).json({ error: 'Dados de entrada inválidos' });
+  }
+
+  try {
+    const result = runtimeCapabilities.hasEntradasTenantId
+      ? await pool.query(
+        `UPDATE entradas
+         SET tipo = $1, valor = $2, mes = $3
+         WHERE id::text = $4 AND tenant_id = $5
+         RETURNING *`,
+        [tipo, valorNumerico, mes, req.params.id, req.user.tenant_id]
+      )
+      : await pool.query(
+        `UPDATE entradas
+         SET tipo = $1, valor = $2, mes = $3
+         WHERE id::text = $4
+         RETURNING *`,
+        [tipo, valorNumerico, mes, req.params.id]
+      );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Entrada não encontrada' });
+    }
+
+    return res.json(result.rows[0]);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/entradas/:id', authenticateToken, requireTenantScope, requireRole('admin'), async (req, res) => {
+  try {
+    if (runtimeCapabilities.hasEntradasTenantId) {
+      await pool.query('DELETE FROM entradas WHERE id::text = $1 AND tenant_id = $2', [req.params.id, req.user.tenant_id]);
+    } else {
+      await pool.query('DELETE FROM entradas WHERE id::text = $1', [req.params.id]);
+    }
+
+    res.json({ message: 'Entrada excluída com sucesso' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 

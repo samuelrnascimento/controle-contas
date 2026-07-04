@@ -38,6 +38,7 @@ const defaultDate = new Date().toISOString().slice(0, 10);
 
 const emptyCompra = () => ({ item: '', quantidade: '', valor: '', mes: defaultMonth });
 const emptyConta = () => ({ tipo: '', valor: '', mes: defaultMonth });
+const emptyEntrada = () => ({ tipo: '', valor: '', mes: defaultMonth });
 const emptyLazer = () => ({ descricao: '', valor: '', mes: defaultMonth });
 const emptyManutencao = () => ({ descricao: '', valor: '', data: defaultDate });
 const emptyInvestimento = () => ({ descricao: '', valor: '', mes: defaultMonth, nota: '' });
@@ -166,6 +167,7 @@ const readMonthlyViewPreferences = () => {
         reportMonth: defaultMonth,
         comprasMonth: defaultMonth,
         contasMonth: defaultMonth,
+        entradasMonth: defaultMonth,
         lazerMonth: defaultMonth,
         manutencoesMonth: defaultMonth,
         investimentosMonth: defaultMonth
@@ -178,6 +180,7 @@ const readMonthlyViewPreferences = () => {
       reportMonth: isMonthValueValid(parsed?.reportMonth) ? parsed.reportMonth : defaultMonth,
       comprasMonth: isMonthValueValid(parsed?.comprasMonth) ? parsed.comprasMonth : defaultMonth,
       contasMonth: isMonthValueValid(parsed?.contasMonth) ? parsed.contasMonth : defaultMonth,
+      entradasMonth: isMonthValueValid(parsed?.entradasMonth) ? parsed.entradasMonth : defaultMonth,
       lazerMonth: isMonthValueValid(parsed?.lazerMonth) ? parsed.lazerMonth : defaultMonth,
       manutencoesMonth: isMonthValueValid(parsed?.manutencoesMonth) ? parsed.manutencoesMonth : defaultMonth,
       investimentosMonth: isMonthValueValid(parsed?.investimentosMonth) ? parsed.investimentosMonth : defaultMonth
@@ -187,6 +190,7 @@ const readMonthlyViewPreferences = () => {
       reportMonth: defaultMonth,
       comprasMonth: defaultMonth,
       contasMonth: defaultMonth,
+      entradasMonth: defaultMonth,
       lazerMonth: defaultMonth,
       manutencoesMonth: defaultMonth,
       investimentosMonth: defaultMonth
@@ -202,6 +206,7 @@ const currencyFormatter = new Intl.NumberFormat('pt-BR', {
 const tabs = [
   { key: 'compras', label: 'Compras do Mês', icon: ShoppingCart },
   { key: 'contas', label: 'Contas Fixas', icon: DollarSign },
+  { key: 'entradas', label: 'Entradas', icon: PlusCircle },
   { key: 'lazer', label: 'Lazer', icon: Gamepad2 },
   { key: 'investimentos', label: 'Investimentos', icon: Landmark },
   { key: 'manutencoes', label: 'Extraordinárias', icon: Wrench },
@@ -361,6 +366,7 @@ const FinanceApp = () => {
   const [activeTab, setActiveTab] = useState('compras');
   const [compras, setCompras] = useState([]);
   const [contas, setContas] = useState([]);
+  const [entradas, setEntradas] = useState([]);
   const [lazer, setLazer] = useState([]);
   const [categorias, setCategorias] = useState([]);
   const [investimentos, setInvestimentos] = useState([]);
@@ -377,16 +383,19 @@ const FinanceApp = () => {
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   const [novaCompra, setNovaCompra] = useState(emptyCompra());
   const [novaConta, setNovaConta] = useState(emptyConta());
+  const [novaEntrada, setNovaEntrada] = useState(emptyEntrada());
   const [novoLazer, setNovoLazer] = useState(emptyLazer());
   const [novoInvestimento, setNovoInvestimento] = useState(emptyInvestimento());
   const [novaManutencao, setNovaManutencao] = useState(emptyManutencao());
   const [editingCompraId, setEditingCompraId] = useState(null);
   const [editingContaId, setEditingContaId] = useState(null);
+  const [editingEntradaId, setEditingEntradaId] = useState(null);
   const [editingLazerId, setEditingLazerId] = useState(null);
   const [editingManutencaoId, setEditingManutencaoId] = useState(null);
   const [editingInvestimentoId, setEditingInvestimentoId] = useState(null);
   const [novoUsuario, setNovoUsuario] = useState(emptyNovoUsuario());
   const [novaCategoriaConta, setNovaCategoriaConta] = useState('');
+  const [novaCategoriaEntrada, setNovaCategoriaEntrada] = useState('');
   const [novaCategoriaInvestimento, setNovaCategoriaInvestimento] = useState('');
   const [showCreateTenantForm, setShowCreateTenantForm] = useState(false);
   const [createTenantForm, setCreateTenantForm] = useState(emptyCreateTenantForm());
@@ -402,6 +411,7 @@ const FinanceApp = () => {
   const [mesRelatorio, setMesRelatorio] = useState(monthlyViewPreferences.reportMonth);
   const [mesFiltroCompras, setMesFiltroCompras] = useState(monthlyViewPreferences.comprasMonth);
   const [mesFiltroContas, setMesFiltroContas] = useState(monthlyViewPreferences.contasMonth);
+  const [mesFiltroEntradas, setMesFiltroEntradas] = useState(monthlyViewPreferences.entradasMonth);
   const [mesFiltroLazer, setMesFiltroLazer] = useState(monthlyViewPreferences.lazerMonth);
   const [mesFiltroManutencoes, setMesFiltroManutencoes] = useState(monthlyViewPreferences.manutencoesMonth);
   const [mesFiltroInvestimentos, setMesFiltroInvestimentos] = useState(monthlyViewPreferences.investimentosMonth);
@@ -464,6 +474,7 @@ const FinanceApp = () => {
       setPlatformAdmins(adminsData);
       setCompras([]);
       setContas([]);
+      setEntradas([]);
       setLazer([]);
       setCategorias([]);
       setInvestimentos([]);
@@ -477,6 +488,7 @@ const FinanceApp = () => {
     const requests = [
       apiFetch('/compras', { authToken }),
       apiFetch('/contas', { authToken }),
+      apiFetch('/entradas', { authToken }),
       apiFetch('/lazer', { authToken }),
       apiFetch('/categories', { authToken }),
       apiFetch('/investimentos', { authToken }),
@@ -488,10 +500,11 @@ const FinanceApp = () => {
       requests.push(apiFetch('/users', { authToken }));
     }
 
-    const [comprasData, contasData, lazerData, categoriasData, investimentosData, manutencoesData, estoqueData, usersData] = await Promise.all(requests);
+    const [comprasData, contasData, entradasData, lazerData, categoriasData, investimentosData, manutencoesData, estoqueData, usersData] = await Promise.all(requests);
 
     setCompras(comprasData);
     setContas(contasData);
+    setEntradas(entradasData);
     setLazer(lazerData);
     setCategorias(categoriasData);
     setInvestimentos(investimentosData);
@@ -550,12 +563,13 @@ const FinanceApp = () => {
         reportMonth: mesRelatorio,
         comprasMonth: mesFiltroCompras,
         contasMonth: mesFiltroContas,
+        entradasMonth: mesFiltroEntradas,
         lazerMonth: mesFiltroLazer,
         manutencoesMonth: mesFiltroManutencoes,
         investimentosMonth: mesFiltroInvestimentos
       })
     );
-  }, [mesRelatorio, mesFiltroCompras, mesFiltroContas, mesFiltroLazer, mesFiltroManutencoes, mesFiltroInvestimentos]);
+  }, [mesRelatorio, mesFiltroCompras, mesFiltroContas, mesFiltroEntradas, mesFiltroLazer, mesFiltroManutencoes, mesFiltroInvestimentos]);
 
   const handleLogout = () => {
     localStorage.removeItem(TOKEN_STORAGE_KEY);
@@ -563,6 +577,7 @@ const FinanceApp = () => {
     setUser(null);
     setCompras([]);
     setContas([]);
+    setEntradas([]);
     setLazer([]);
     setCategorias([]);
     setInvestimentos([]);
@@ -711,6 +726,29 @@ const FinanceApp = () => {
     }, editingLazerId ? 'Despesa de lazer atualizada com sucesso' : 'Despesa de lazer adicionada com sucesso');
   };
 
+  const adicionarEntrada = async () => {
+    if (!novaEntrada.valor || !novaEntrada.mes || !novaEntrada.tipo) {
+      setErrorMessage('Preencha todos os campos da entrada');
+      return;
+    }
+
+    await runMutation(async () => {
+      if (editingEntradaId) {
+        await apiFetch(`/entradas/${editingEntradaId}`, {
+          method: 'PATCH',
+          body: JSON.stringify(novaEntrada)
+        });
+        setEditingEntradaId(null);
+      } else {
+        await apiFetch('/entradas', {
+          method: 'POST',
+          body: JSON.stringify(novaEntrada)
+        });
+      }
+      setNovaEntrada(emptyEntrada());
+    }, editingEntradaId ? 'Entrada atualizada com sucesso' : 'Entrada adicionada com sucesso');
+  };
+
   const adicionarManutencao = async () => {
     if (!novaManutencao.descricao || !novaManutencao.valor || !novaManutencao.data) {
       setErrorMessage('Preencha todos os campos da manutenção');
@@ -771,6 +809,13 @@ const FinanceApp = () => {
     clearMessages();
   };
 
+  const iniciarEdicaoEntrada = (entrada) => {
+    setActiveTab('entradas');
+    setEditingEntradaId(entrada.id);
+    setNovaEntrada({ tipo: entrada.tipo || '', valor: String(entrada.valor ?? ''), mes: entrada.mes || defaultMonth });
+    clearMessages();
+  };
+
   const iniciarEdicaoLazer = (item) => {
     setActiveTab('lazer');
     setEditingLazerId(item.id);
@@ -811,6 +856,11 @@ const FinanceApp = () => {
     setNovaConta(emptyConta());
   };
 
+  const cancelarEdicaoEntrada = () => {
+    setEditingEntradaId(null);
+    setNovaEntrada(emptyEntrada());
+  };
+
   const cancelarEdicaoLazer = () => {
     setEditingLazerId(null);
     setNovoLazer(emptyLazer());
@@ -842,6 +892,10 @@ const FinanceApp = () => {
 
       if (scope === 'contas') {
         setNovaCategoriaConta('');
+      }
+
+      if (scope === 'entradas') {
+        setNovaCategoriaEntrada('');
       }
 
       if (scope === 'investimentos') {
@@ -1089,16 +1143,19 @@ const FinanceApp = () => {
   const relatorio = useMemo(() => {
     const comprasMes = compras.filter((compra) => compra.mes === mesRelatorio);
     const contasMes = contas.filter((conta) => conta.mes === mesRelatorio);
+    const entradasMes = entradas.filter((entrada) => entrada.mes === mesRelatorio);
     const lazerMes = lazer.filter((item) => item.mes === mesRelatorio);
     const investimentosMes = investimentos.filter((investimento) => investimento.mes === mesRelatorio);
     const manutencoesMes = manutencoes.filter((manutencao) => manutencao.data.slice(0, 7) === mesRelatorio);
 
+    const totalEntradas = entradasMes.reduce((acc, entrada) => acc + Number(entrada.valor), 0);
     const totalCompras = comprasMes.reduce((acc, compra) => acc + Number(compra.valor), 0);
     const totalContas = contasMes.reduce((acc, conta) => acc + Number(conta.valor), 0);
     const totalLazer = lazerMes.reduce((acc, item) => acc + Number(item.valor), 0);
     const totalInvestimentos = investimentosMes.reduce((acc, investimento) => acc + Number(investimento.valor), 0);
     const totalManutencoes = manutencoesMes.reduce((acc, manutencao) => acc + Number(manutencao.valor), 0);
-    const totalGeral = totalCompras + totalContas + totalLazer + totalInvestimentos + totalManutencoes;
+    const totalSaidas = totalCompras + totalContas + totalLazer + totalInvestimentos + totalManutencoes;
+    const saldoMes = totalEntradas - totalSaidas;
 
     const contasPorTipo = contasMes.reduce((acc, conta) => {
       acc[conta.tipo] = (acc[conta.tipo] || 0) + Number(conta.valor);
@@ -1108,18 +1165,21 @@ const FinanceApp = () => {
     return {
       comprasMes,
       contasMes,
+      entradasMes,
       lazerMes,
       investimentosMes,
       manutencoesMes,
       contasPorTipo,
+      totalEntradas,
       totalCompras,
       totalContas,
       totalLazer,
       totalInvestimentos,
       totalManutencoes,
-      totalGeral
+      totalSaidas,
+      saldoMes
     };
-  }, [compras, contas, lazer, investimentos, manutencoes, mesRelatorio]);
+  }, [compras, contas, entradas, lazer, investimentos, manutencoes, mesRelatorio]);
 
   const tenantPlanOptions = useMemo(() => {
     const options = Array.from(new Set(
@@ -1220,6 +1280,14 @@ const FinanceApp = () => {
     return Array.from(new Set(custom)).sort((a, b) => a.localeCompare(b, 'pt-BR'));
   }, [categorias]);
 
+  const categoriasEntrada = useMemo(() => {
+    const custom = categorias
+      .filter((categoria) => categoria.scope === 'entradas')
+      .map((categoria) => categoria.name);
+
+    return Array.from(new Set(custom)).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }, [categorias]);
+
   useEffect(() => {
     if (categoriasConta.length === 0) {
       setNovaConta((current) => ({ ...current, tipo: '' }));
@@ -1241,6 +1309,17 @@ const FinanceApp = () => {
       setNovoInvestimento((current) => ({ ...current, descricao: categoriasInvestimento[0] }));
     }
   }, [categoriasInvestimento, novoInvestimento.descricao]);
+
+  useEffect(() => {
+    if (categoriasEntrada.length === 0) {
+      setNovaEntrada((current) => ({ ...current, tipo: '' }));
+      return;
+    }
+
+    if (!categoriasEntrada.includes(novaEntrada.tipo)) {
+      setNovaEntrada((current) => ({ ...current, tipo: categoriasEntrada[0] }));
+    }
+  }, [categoriasEntrada, novaEntrada.tipo]);
 
   const distributionItems = [
     { label: 'Compras', total: relatorio.totalCompras, className: 'bg-blue-500' },
@@ -1592,6 +1671,55 @@ const FinanceApp = () => {
               </div>
             )}
 
+            {activeTab === 'entradas' && (
+              <div>
+                <SectionHeader title="Entradas Financeiras" description="Registre receitas para compor o saldo mensal." />
+                {editingEntradaId && (
+                  <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900">
+                    Editando uma entrada financeira. Altere os campos abaixo e salve as alterações.
+                  </div>
+                )}
+                <div className="mt-6 grid gap-4 md:grid-cols-4">
+                  <select
+                    value={novaEntrada.tipo}
+                    onChange={(event) => setNovaEntrada((current) => ({ ...current, tipo: event.target.value }))}
+                    className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                  >
+                    {categoriasEntrada.length === 0 && <option value="">Cadastre categorias na aba Categorias</option>}
+                    {categoriasEntrada.map((categoria) => (
+                      <option key={categoria} value={categoria}>{categoria}</option>
+                    ))}
+                  </select>
+                  <Field type="number" value={novaEntrada.valor} onChange={(value) => setNovaEntrada((current) => ({ ...current, valor: value }))} placeholder="Valor" />
+                  <Field type="month" value={novaEntrada.mes} onChange={(value) => setNovaEntrada((current) => ({ ...current, mes: value }))} />
+                  <PrimaryButton icon={editingEntradaId ? Pencil : PlusCircle} onClick={adicionarEntrada} disabled={loading || categoriasEntrada.length === 0} label={editingEntradaId ? 'Salvar alterações' : 'Adicionar'} />
+                </div>
+                {editingEntradaId && (
+                  <div className="mt-3">
+                    <SecondaryTextButton onClick={cancelarEdicaoEntrada} label="Cancelar edição" />
+                  </div>
+                )}
+                <FilterMonth value={mesFiltroEntradas} onChange={setMesFiltroEntradas} />
+                <DataTable
+                  headers={['Categoria', 'Valor', 'Mês', 'Ações']}
+                  rows={entradas.filter((entrada) => entrada.mes === mesFiltroEntradas).map((entrada) => [
+                    entrada.tipo,
+                    formatCurrency(entrada.valor),
+                    entrada.mes,
+                    isAdmin ? (
+                      <div key={`actions-entrada-${entrada.id}`} className="flex items-center gap-3">
+                        <SecondaryTextButton onClick={() => iniciarEdicaoEntrada(entrada)} label="Editar" />
+                        <DangerTextButton onClick={() => excluirRegistro(`/entradas/${entrada.id}`, 'Entrada excluída com sucesso')} label="Excluir" />
+                      </div>
+                    ) : (
+                      <span key={`readonly-entrada-${entrada.id}`} className="text-sm text-slate-400">Somente admin altera/exclui</span>
+                    )
+                  ])}
+                  emptyMessage="Nenhuma entrada registrada para este mês"
+                />
+              </div>
+            )}
+
             {activeTab === 'lazer' && (
               <div>
                 <SectionHeader title="Despesas de Lazer" description="Controle mensal dos gastos com lazer e entretenimento." />
@@ -1762,12 +1890,14 @@ const FinanceApp = () => {
                   <Field type="month" value={mesRelatorio} onChange={setMesRelatorio} />
                 </div>
                 <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  <MetricCard title="Entradas" value={formatCurrency(relatorio.totalEntradas)} tone="bg-emerald-100 text-emerald-900" />
                   <MetricCard title="Compras" value={formatCurrency(relatorio.totalCompras)} tone="bg-blue-100 text-blue-900" />
-                  <MetricCard title="Contas" value={formatCurrency(relatorio.totalContas)} tone="bg-emerald-100 text-emerald-900" />
+                  <MetricCard title="Contas" value={formatCurrency(relatorio.totalContas)} tone="bg-cyan-100 text-cyan-900" />
                   <MetricCard title="Lazer" value={formatCurrency(relatorio.totalLazer)} tone="bg-fuchsia-100 text-fuchsia-900" />
                   <MetricCard title="Investimentos" value={formatCurrency(relatorio.totalInvestimentos)} tone="bg-indigo-100 text-indigo-900" />
                   <MetricCard title="Extraordinárias" value={formatCurrency(relatorio.totalManutencoes)} tone="bg-amber-100 text-amber-900" />
-                  <MetricCard title="Total Geral" value={formatCurrency(relatorio.totalGeral)} tone="bg-rose-100 text-rose-900" />
+                  <MetricCard title="Total Saídas" value={formatCurrency(relatorio.totalSaidas)} tone="bg-rose-100 text-rose-900" />
+                  <MetricCard title="Saldo do Mês" value={formatCurrency(relatorio.saldoMes)} tone={relatorio.saldoMes >= 0 ? 'bg-lime-100 text-lime-900' : 'bg-red-100 text-red-900'} />
                 </div>
 
                 <div className="mt-8 grid gap-6 xl:grid-cols-2">
@@ -1794,10 +1924,10 @@ const FinanceApp = () => {
                   </div>
 
                   <div className="rounded-[28px] border border-slate-200/80 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5 shadow-[0_12px_35px_rgba(15,23,42,0.05)]">
-                    <h3 className="text-lg font-bold">Distribuição geral</h3>
+                    <h3 className="text-lg font-bold">Distribuição das saídas</h3>
                     <div className="mt-4 space-y-4">
                       {distributionItems.map((item) => {
-                        const width = relatorio.totalGeral > 0 ? valueToPercent(item.total, relatorio.totalGeral) : 0;
+                        const width = relatorio.totalSaidas > 0 ? valueToPercent(item.total, relatorio.totalSaidas) : 0;
 
                         return (
                           <div key={item.label}>
@@ -1951,6 +2081,29 @@ const FinanceApp = () => {
                         </button>
                       ))}
                       {categorias.filter((categoria) => categoria.scope === 'investimentos').length === 0 && (
+                        <p className="text-sm text-slate-500">Nenhuma categoria cadastrada.</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="rounded-[28px] border border-slate-200/80 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5 shadow-[0_12px_35px_rgba(15,23,42,0.05)]">
+                    <h3 className="text-lg font-bold">Categorias de Entradas</h3>
+                    <div className="mt-4 flex flex-col gap-3 md:flex-row">
+                      <Field value={novaCategoriaEntrada} onChange={setNovaCategoriaEntrada} placeholder="Nome da categoria" />
+                      <PrimaryButton icon={PlusCircle} onClick={() => adicionarCategoria('entradas', novaCategoriaEntrada)} disabled={loading} label="Adicionar" />
+                    </div>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {categorias.filter((categoria) => categoria.scope === 'entradas').map((categoria) => (
+                        <button
+                          key={categoria.id}
+                          type="button"
+                          onClick={() => excluirCategoria(categoria.id)}
+                          className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                        >
+                          {categoria.name} <Trash2 size={14} />
+                        </button>
+                      ))}
+                      {categorias.filter((categoria) => categoria.scope === 'entradas').length === 0 && (
                         <p className="text-sm text-slate-500">Nenhuma categoria cadastrada.</p>
                       )}
                     </div>
@@ -2365,6 +2518,7 @@ const FinanceApp = () => {
               <p className="text-sm uppercase tracking-[0.22em] text-emerald-300">Resumo</p>
               <div className="mt-4 space-y-4">
                 {!isPlatformAdmin && <SummaryRow label="Contas cadastradas" value={String(contas.length)} />}
+                {!isPlatformAdmin && <SummaryRow label="Entradas cadastradas" value={String(entradas.length)} />}
                 {!isPlatformAdmin && <SummaryRow label="Investimentos" value={String(investimentos.length)} />}
                 {!isPlatformAdmin && <SummaryRow label="Extraordinárias" value={String(manutencoes.length)} />}
                 {!isPlatformAdmin && <SummaryRow label="Itens em estoque" value={String(estoque.length)} />}
