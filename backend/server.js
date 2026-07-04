@@ -267,7 +267,6 @@ const ensureSchema = async () => {
     ALTER TABLE users ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT TRUE;
     ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
 
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_users_single_admin ON users (role) WHERE role = 'admin';
     CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
 
     CREATE TABLE IF NOT EXISTS compras (
@@ -378,6 +377,9 @@ const ensureTenantSchema = async () => {
 
   await pool.query(`
     ALTER TABLE tenants ADD COLUMN IF NOT EXISTS trial_expires_at TIMESTAMP;
+
+    -- Legacy index from single-tenant mode blocks admin creation in other tenants.
+    DROP INDEX IF EXISTS idx_users_single_admin;
 
     UPDATE tenants
     SET trial_expires_at = COALESCE(trial_expires_at, created_at + INTERVAL '7 days')
@@ -791,8 +793,14 @@ app.post('/api/auth/signup', async (req, res) => {
     await client.query('ROLLBACK');
 
     if (error.code === '23505') {
-      if (String(error.constraint || '').includes('users')) {
+      const constraint = String(error.constraint || '').toLowerCase();
+
+      if (constraint.includes('users_email')) {
         return res.status(409).json({ error: 'Já existe usuário com este e-mail' });
+      }
+
+      if (constraint.includes('users_single_admin')) {
+        return res.status(409).json({ error: 'Conflito na regra antiga de admin único. Reinicie o backend para aplicar a migração.' });
       }
 
       return res.status(409).json({ error: 'Já existe tenant com este slug' });
@@ -1872,8 +1880,14 @@ app.post('/api/platform/tenants', authenticateToken, requirePlatformAdmin, async
     await client.query('ROLLBACK');
 
     if (error.code === '23505') {
-      if (String(error.constraint || '').includes('users')) {
+      const constraint = String(error.constraint || '').toLowerCase();
+
+      if (constraint.includes('users_email')) {
         return res.status(409).json({ error: 'Já existe usuário com este e-mail' });
+      }
+
+      if (constraint.includes('users_single_admin')) {
+        return res.status(409).json({ error: 'Conflito na regra antiga de admin único. Reinicie o backend para aplicar a migração.' });
       }
 
       return res.status(409).json({ error: 'Já existe tenant com este slug' });
@@ -2028,8 +2042,14 @@ app.patch('/api/platform/tenants/:id', authenticateToken, requirePlatformAdmin, 
     await client.query('ROLLBACK');
 
     if (error.code === '23505') {
-      if (String(error.constraint || '').includes('users')) {
+      const constraint = String(error.constraint || '').toLowerCase();
+
+      if (constraint.includes('users_email')) {
         return res.status(409).json({ error: 'Já existe usuário com este e-mail' });
+      }
+
+      if (constraint.includes('users_single_admin')) {
+        return res.status(409).json({ error: 'Conflito na regra antiga de admin único. Reinicie o backend para aplicar a migração.' });
       }
 
       return res.status(409).json({ error: 'Já existe tenant com este slug' });
