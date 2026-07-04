@@ -1438,10 +1438,8 @@ const FinanceApp = () => {
           <div className="relative flex flex-col gap-6 px-8 py-8 lg:flex-row lg:items-start lg:justify-between lg:px-10">
             <div className="flex-1 rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur">
               <p className="text-sm uppercase tracking-[0.32em] text-emerald-300">Finansam Control Center</p>
-              <h1 className="mt-3 max-w-3xl text-4xl font-black tracking-tight text-white">Plataforma Administrativa com visão operacional, financeira e governança por acesso.</h1>
-              <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-300">
-                Centralize lançamentos, usuários, categorias, estoque e relatórios em um ambiente único, com separação entre tenant e plataforma e leitura executiva da operação.
-              </p>
+              <h1 className="mt-3 max-w-3xl text-4xl font-black tracking-tight text-white">FinanSAM</h1>
+              <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-300">Controle Financeiro</p>
             </div>
 
             <div className="w-full rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur lg:max-w-sm">
