@@ -1821,7 +1821,7 @@ const FinanceApp = () => {
               <div>
                 <SectionHeader title="Portal Administrativo" description="Gestão do proprietário: acessos, senhas e diagnóstico da migração para backend centralizado." />
 
-                <div className="mt-6 grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+                <div className="mt-6 grid gap-6">
                   <div className="rounded-[28px] border border-slate-200/80 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5 shadow-[0_12px_35px_rgba(15,23,42,0.05)]">
                     <div className="flex items-center gap-3">
                       <UserPlus size={20} />
@@ -1833,20 +1833,6 @@ const FinanceApp = () => {
                       <Field type="password" value={novoUsuario.password} onChange={(value) => setNovoUsuario((current) => ({ ...current, password: value }))} placeholder="Senha temporária" />
                       <PrimaryButton icon={Users} onClick={criarUsuario} disabled={loading} label="Criar usuário" />
                     </div>
-                  </div>
-
-                  <div className="rounded-[28px] border border-slate-200/80 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5 shadow-[0_12px_35px_rgba(15,23,42,0.05)]">
-                    <div className="flex items-center gap-3">
-                      <AlertCircle size={20} />
-                      <h3 className="text-lg font-bold">Diagnóstico e migração</h3>
-                    </div>
-                    <ul className="mt-4 space-y-3 text-sm leading-6 text-slate-700">
-                      <li>Antes, o frontend persistia tudo em localStorage. Isso impedia governança central, auditoria e acesso por múltiplos usuários.</li>
-                      <li>Agora, login e autorização passam pelo backend, com token JWT e dados persistidos no PostgreSQL.</li>
-                      <li>Existe exatamente um administrador proprietário. Usuários adicionais são sempre operacionais.</li>
-                      <li>Exclusões de compras, contas e extraordinárias ficam restritas ao proprietário para reduzir risco operacional.</li>
-                      <li>Os registros antigos em localStorage não são migrados automaticamente. Se houver dados no navegador antigo, eles precisam ser importados manualmente.</li>
-                    </ul>
                   </div>
                 </div>
 
