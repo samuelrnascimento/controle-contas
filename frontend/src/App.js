@@ -1512,7 +1512,6 @@ const FinanceApp = () => {
 
           <div className="relative flex flex-col gap-6 px-8 py-8 lg:flex-row lg:items-start lg:justify-between lg:px-10">
             <div className="flex-1 rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur">
-              <p className="text-sm uppercase tracking-[0.32em] text-emerald-300">Finansam Control Center</p>
               <h1 className="mt-3 max-w-3xl text-4xl font-black tracking-tight text-white">FinanSAM</h1>
               <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-300">Controle Financeiro</p>
             </div>
@@ -1578,7 +1577,7 @@ const FinanceApp = () => {
           <div className="rounded-[32px] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.97)_0%,rgba(248,250,252,0.95)_100%)] p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
             {activeTab === 'compras' && (
               <div>
-                <SectionHeader title="Compras do Mês" description="Toda compra alimenta automaticamente o estoque central." />
+                <SectionHeader title="Compras" />
                 {editingCompraId && (
                   <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900">
                     Editando uma compra existente. Altere os campos abaixo e salve as alterações.
@@ -1620,7 +1619,7 @@ const FinanceApp = () => {
 
             {activeTab === 'contas' && (
               <div>
-                <SectionHeader title="Contas Fixas" description="Registro mensal consolidado por categoria." />
+                <SectionHeader title="Contas Fixas" />
                 {editingContaId && (
                   <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900">
                     Editando uma conta fixa. Altere os campos abaixo e salve as alterações.
@@ -1669,7 +1668,7 @@ const FinanceApp = () => {
 
             {activeTab === 'entradas' && (
               <div>
-                <SectionHeader title="Entradas Financeiras" description="Registre receitas para compor o saldo mensal." />
+                <SectionHeader title="Entradas" />
                 {editingEntradaId && (
                   <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900">
                     Editando uma entrada financeira. Altere os campos abaixo e salve as alterações.
@@ -1722,7 +1721,7 @@ const FinanceApp = () => {
 
             {activeTab === 'lazer' && (
               <div>
-                <SectionHeader title="Despesas de Lazer" description="Controle mensal dos gastos com lazer e entretenimento." />
+                <SectionHeader title="Lazer" />
                 {editingLazerId && (
                   <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900">
                     Editando uma despesa de lazer. Altere os campos abaixo e salve as alterações.
@@ -1762,7 +1761,7 @@ const FinanceApp = () => {
 
             {activeTab === 'manutencoes' && (
               <div>
-                <SectionHeader title="Extraordinárias" description="Custos ocasionais separados das contas fixas." />
+                <SectionHeader title="Extraordinárias" />
                 {editingManutencaoId && (
                   <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900">
                     Editando uma despesa extraordinária. Altere os campos abaixo e salve as alterações.
@@ -1802,7 +1801,7 @@ const FinanceApp = () => {
 
             {activeTab === 'investimentos' && (
               <div>
-                <SectionHeader title="Investimentos" description="Aportes mensais de investimentos e reservas." />
+                <SectionHeader title="Investimentos" />
                 {editingInvestimentoId && (
                   <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900">
                     Editando um investimento. Altere os campos abaixo e salve as alterações.
@@ -1855,7 +1854,7 @@ const FinanceApp = () => {
 
             {activeTab === 'estoque' && (
               <div>
-                <SectionHeader title="Controle de Estoque" description="Qualquer usuário ativo pode registrar baixa, respeitando saldo disponível." />
+                <SectionHeader title="Estoque" />
                 <DataTable
                   headers={['Item', 'Quantidade', 'Baixa']}
                   rows={estoque.map((item) => [
@@ -2515,7 +2514,7 @@ const FinanceApp = () => {
 
           <aside className="space-y-6">
             <div className="rounded-[28px] bg-slate-950 p-6 text-white shadow-xl shadow-slate-300/40">
-              <p className="text-sm uppercase tracking-[0.22em] text-emerald-300">Resumo</p>
+              <p className="text-sm uppercase tracking-[0.30em] text-emerald-300">Resumo</p>
               <div className="mt-4 space-y-4">
                 {!isPlatformAdmin && <SummaryRow label="Contas cadastradas" value={String(contas.length)} />}
                 {!isPlatformAdmin && <SummaryRow label="Entradas cadastradas" value={String(entradas.length)} />}
@@ -2543,7 +2542,7 @@ const FinanceApp = () => {
             >
               Powered By SMCorp
             </a>
-            <p>Finansam {new Date().getFullYear()} • Plataforma administrativa com padrão corporativo</p>
+            <p>Finansam • Plataforma de Controle Financeiro</p>
           </div>
         </footer>
       </div>
