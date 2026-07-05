@@ -51,8 +51,30 @@ const normalizeTenantPlan = (value) => {
     return 'Smart';
   }
 
+  if (normalized === 'smarter') {
+    return 'Smart';
+  }
+
   if (normalized === 'premium') {
     return 'Premium';
+  }
+
+  return null;
+};
+
+const getLicenseDurationDays = (plan) => {
+  const normalized = normalizeTenantPlan(plan);
+
+  if (normalized === 'Starter') {
+    return 7;
+  }
+
+  if (normalized === 'Smart') {
+    return 30;
+  }
+
+  if (normalized === 'Premium') {
+    return 365;
   }
 
   return null;
@@ -78,8 +100,8 @@ const normalizeTenantStatus = (value) => {
 
 const addDays = (days) => new Date(Date.now() + (days * 24 * 60 * 60 * 1000));
 
-const isTrialExpired = (tenant) => {
-  if (!tenant || tenant.subscription_status !== 'trial' || !tenant.trial_expires_at) {
+const isLicenseExpired = (tenant) => {
+  if (!tenant || !tenant.trial_expires_at) {
     return false;
   }
 
@@ -212,8 +234,8 @@ const authenticateToken = async (req, res, next) => {
         return res.status(401).json({ error: 'Tenant inativo' });
       }
 
-      if (isTrialExpired(tenant)) {
-        return res.status(401).json({ error: 'Seu trial expirou. Entre em contato para renovar.' });
+      if (isLicenseExpired(tenant)) {
+        return res.status(401).json({ error: 'Sua licença expirou. Entre em contato para renovar.' });
       }
     }
 
@@ -382,8 +404,15 @@ const ensureTenantSchema = async () => {
     DROP INDEX IF EXISTS idx_users_single_admin;
 
     UPDATE tenants
-    SET trial_expires_at = COALESCE(trial_expires_at, created_at + INTERVAL '7 days')
-    WHERE subscription_status = 'trial' AND trial_expires_at IS NULL;
+    SET trial_expires_at = COALESCE(
+      trial_expires_at,
+      created_at + CASE
+        WHEN plan = 'Premium' THEN INTERVAL '365 days'
+        WHEN plan = 'Smart' THEN INTERVAL '30 days'
+        ELSE INTERVAL '7 days'
+      END
+    )
+    WHERE trial_expires_at IS NULL;
   `);
 };
 
@@ -712,8 +741,8 @@ app.post('/api/auth/login', async (req, res) => {
         return res.status(401).json({ error: 'Tenant inativo' });
       }
 
-      if (isTrialExpired(user)) {
-        return res.status(401).json({ error: 'Seu trial expirou. Entre em contato para renovar.' });
+      if (isLicenseExpired(user)) {
+        return res.status(401).json({ error: 'Sua licença expirou. Entre em contato para renovar.' });
       }
     }
 
@@ -732,6 +761,7 @@ app.post('/api/auth/signup', async (req, res) => {
   const lastName = String(req.body?.lastName || '').trim();
   const company = String(req.body?.company || '').trim();
   const signupTenantPlan = 'Starter';
+  const signupExpiresAt = addDays(getLicenseDurationDays(signupTenantPlan) || 7);
   const phone = String(req.body?.phone || '').trim();
   const email = String(req.body?.email || '').trim().toLowerCase();
   const adminEmail = String(req.body?.adminEmail || email || '').trim().toLowerCase();
@@ -759,9 +789,9 @@ app.post('/api/auth/signup', async (req, res) => {
 
     const tenantResult = await client.query(
       `INSERT INTO tenants (name, slug, plan, subscription_status, trial_expires_at)
-       VALUES ($1, $2, $3, 'trial', $4)
+       VALUES ($1, $2, $3, 'active', $4)
        RETURNING id, name, slug, plan, subscription_status, trial_expires_at, created_at`,
-      [tenantName, tenantSlug, signupTenantPlan, addDays(7)]
+      [tenantName, tenantSlug, signupTenantPlan, signupExpiresAt]
     );
 
     const tenant = tenantResult.rows[0];
@@ -773,7 +803,7 @@ app.post('/api/auth/signup', async (req, res) => {
       [tenant.id, ownerName || firstName, adminEmail, passwordHash]
     );
 
-    await applyTenantUserStatus(client, tenant.id, 'trial');
+    await applyTenantUserStatus(client, tenant.id, 'active');
     await client.query('COMMIT');
 
     const createdAdmin = {
@@ -1846,7 +1876,8 @@ app.post('/api/platform/tenants', authenticateToken, requirePlatformAdmin, async
     return res.status(400).json({ error: 'A senha do usuário admin deve ter ao menos 6 caracteres' });
   }
 
-  const trialExpiresAt = subscriptionStatus === 'trial' ? addDays(7) : null;
+  const planDurationDays = getLicenseDurationDays(plan);
+  const licenseExpiresAt = planDurationDays ? addDays(planDurationDays) : null;
 
   const client = await pool.connect();
 
@@ -1857,7 +1888,7 @@ app.post('/api/platform/tenants', authenticateToken, requirePlatformAdmin, async
       `INSERT INTO tenants (name, slug, plan, subscription_status, trial_expires_at)
        VALUES ($1, $2, $3, $4, $5)
        RETURNING id, name, slug, plan, subscription_status, trial_expires_at, created_at`,
-      [name, slug, plan, subscriptionStatus, trialExpiresAt]
+      [name, slug, plan, subscriptionStatus, licenseExpiresAt]
     );
 
     const tenant = result.rows[0];
@@ -1956,11 +1987,9 @@ app.patch('/api/platform/tenants/:id', authenticateToken, requirePlatformAdmin, 
     return res.status(400).json({ error: 'A senha do usuário admin deve ter ao menos 6 caracteres' });
   }
 
-  const nextTrialExpiresAt = nextStatus === 'trial'
-    ? addDays(7)
-    : req.body?.subscriptionStatus !== undefined
-      ? null
-      : undefined;
+  const nextLicenseExpiresAt = req.body?.plan !== undefined
+    ? addDays(getLicenseDurationDays(nextPlan) || 7)
+    : undefined;
 
   if (nextName === null && nextSlug === null && nextPlan === null && nextStatus === null && !createAdminUser) {
     return res.status(400).json({ error: 'Informe ao menos um campo para atualização' });
@@ -1993,13 +2022,12 @@ app.patch('/api/platform/tenants/:id', authenticateToken, requirePlatformAdmin, 
            plan = COALESCE($3, plan),
            subscription_status = COALESCE($4, subscription_status),
            trial_expires_at = CASE
-             WHEN $4 IS NULL THEN trial_expires_at
-             WHEN $4 = 'trial' THEN COALESCE(trial_expires_at, $6)
-             ELSE NULL
+             WHEN $3 IS NOT NULL THEN COALESCE($6, trial_expires_at)
+             ELSE trial_expires_at
            END
        WHERE id::text = $5
        RETURNING id, name, slug, plan, subscription_status, trial_expires_at, created_at`,
-      [nextName, nextSlug, nextPlan, nextStatus, targetId, nextTrialExpiresAt]
+      [nextName, nextSlug, nextPlan, nextStatus, targetId, nextLicenseExpiresAt]
     );
 
     const tenant = result.rows[0];

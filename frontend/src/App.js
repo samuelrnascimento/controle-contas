@@ -32,9 +32,8 @@ const MONTHLY_VIEW_STORAGE_KEY = 'finansam-monthly-view';
 const PLATFORM_USERS_PAGE_SIZE = 10;
 const TENANT_PLANS = ['Starter', 'Smart', 'Premium'];
 const TENANT_LICENSE_TYPES = [
-  { value: 'starter_trial', label: 'Starter (Trial 7 dias)' },
   { value: 'starter', label: 'Starter' },
-  { value: 'smart', label: 'Smart' },
+  { value: 'smarter', label: 'Smarter' },
   { value: 'premium', label: 'Premium' }
 ];
 const TENANT_STATUSES = [
@@ -105,6 +104,10 @@ const normalizeTenantPlan = (value) => {
     return 'Smart';
   }
 
+  if (normalized === 'smarter') {
+    return 'Smart';
+  }
+
   if (normalized === 'premium') {
     return 'Premium';
   }
@@ -147,18 +150,13 @@ const getTrialDaysRemaining = (trialExpiresAt) => {
 
 const licenseTypeFromTenant = (plan, status) => {
   const normalizedPlan = normalizeTenantPlan(plan);
-  const normalizedStatus = normalizeTenantStatus(status);
-
-  if (normalizedPlan === 'Starter' && normalizedStatus === 'trial') {
-    return 'starter_trial';
-  }
 
   if (normalizedPlan === 'Starter') {
     return 'starter';
   }
 
   if (normalizedPlan === 'Smart') {
-    return 'smart';
+    return 'smarter';
   }
 
   if (normalizedPlan === 'Premium') {
@@ -171,19 +169,29 @@ const licenseTypeFromTenant = (plan, status) => {
 const tenantConfigFromLicenseType = (licenseType, currentStatus) => {
   const normalizedStatus = normalizeTenantStatus(currentStatus) || 'active';
 
-  if (licenseType === 'starter_trial') {
-    return { plan: 'Starter', status: 'trial' };
+  if (licenseType === 'starter') {
+    return { plan: 'Starter', status: normalizedStatus === 'inactive' ? 'inactive' : 'active' };
   }
 
-  if (licenseType === 'smart') {
-    return { plan: 'Smart', status: normalizedStatus === 'trial' ? 'active' : normalizedStatus };
+  if (licenseType === 'smarter') {
+    return { plan: 'Smart', status: normalizedStatus === 'inactive' ? 'inactive' : 'active' };
   }
 
   if (licenseType === 'premium') {
-    return { plan: 'Premium', status: normalizedStatus === 'trial' ? 'active' : normalizedStatus };
+    return { plan: 'Premium', status: normalizedStatus === 'inactive' ? 'inactive' : 'active' };
   }
 
-  return { plan: 'Starter', status: normalizedStatus === 'trial' ? 'active' : normalizedStatus };
+  return { plan: 'Starter', status: normalizedStatus === 'inactive' ? 'inactive' : 'active' };
+};
+
+const formatTenantPlanLabel = (plan) => {
+  const normalizedPlan = normalizeTenantPlan(plan);
+
+  if (normalizedPlan === 'Smart') {
+    return 'Smarter';
+  }
+
+  return normalizedPlan || '-';
 };
 
 const readTenantViewPreferences = () => {
@@ -598,9 +606,8 @@ const FinanceApp = () => {
   const tenantPlan = normalizeTenantPlan(user?.tenantPlan || user?.tenant_plan || '');
   const tenantSubscriptionStatus = normalizeTenantStatus(user?.tenantSubscriptionStatus || user?.subscription_status || '');
   const trialDaysRemaining = getTrialDaysRemaining(user?.tenantTrialExpiresAt || user?.trial_expires_at);
-  const showTrialCountdown = !isPlatformAdmin
-    && tenantPlan === 'Starter'
-    && tenantSubscriptionStatus === 'trial'
+  const showLicenseCountdown = !isPlatformAdmin
+    && tenantPlan !== null
     && trialDaysRemaining !== null;
 
   const apiFetch = async (path, options = {}) => {
@@ -821,7 +828,7 @@ const FinanceApp = () => {
       await loadProtectedData(data.user, data.token);
       setPublicSignupForm(emptyPublicSignupForm());
       setShowPublicSignupForm(false);
-      setSuccessMessage('Cadastro criado com trial de 7 dias');
+      setSuccessMessage('Cadastro criado com licença Starter de 7 dias');
     } catch (error) {
       setErrorMessage(normalizeError(error));
     } finally {
@@ -1670,7 +1677,7 @@ const FinanceApp = () => {
             <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3">
               <div>
                 <p className="text-sm font-semibold text-slate-800">Novo por aqui?</p>
-                <p className="text-xs text-slate-500">Crie seu tenant com trial de 7 dias.</p>
+                <p className="text-xs text-slate-500">Crie seu tenant com licença Starter válida por 7 dias.</p>
               </div>
               <button
                 type="button"
@@ -1684,8 +1691,8 @@ const FinanceApp = () => {
             {showPublicSignupForm && (
               <form className="mt-5 space-y-4 rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_14px_35px_rgba(15,23,42,0.08)]" onSubmit={handlePublicSignup}>
                 <div>
-                  <h3 className="text-lg font-bold text-slate-900">Cadastro com trial</h3>
-                  <p className="text-sm text-slate-600">Seu tenant nasce ativo por 7 dias. Após isso, a assinatura precisa ser renovada.</p>
+                  <h3 className="text-lg font-bold text-slate-900">Cadastro com licença Starter</h3>
+                  <p className="text-sm text-slate-600">Seu tenant nasce com licença Starter válida por 7 dias. Após isso, a assinatura precisa ser renovada.</p>
                 </div>
                 <div className="grid gap-4 md:grid-cols-2">
                   <label className="block">
@@ -1789,13 +1796,13 @@ const FinanceApp = () => {
                 <p className="text-sm text-slate-300">{user.email}</p>
                 {!isPlatformAdmin && (
                   <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2">
-                    <p className="text-[11px] uppercase tracking-[0.2em] text-slate-400">Plano atual</p>
-                    <p className="mt-1 text-sm font-semibold text-emerald-200">{tenantPlan || 'Starter'}</p>
-                    {showTrialCountdown && (
+                    <p className="text-[11px] uppercase tracking-[0.2em] text-slate-400">Licença atual</p>
+                    <p className="mt-1 text-sm font-semibold text-emerald-200">{formatTenantPlanLabel(tenantPlan) || 'Starter'}</p>
+                    {showLicenseCountdown && (
                       <p className="mt-1 text-xs text-slate-300">
                         {trialDaysRemaining > 0
-                          ? `Restam ${trialDaysRemaining} dia(s) no trial Starter`
-                          : 'Trial Starter encerrado'}
+                          ? `Restam ${trialDaysRemaining} dia(s) na licença`
+                          : 'Licença encerrada'}
                       </p>
                     )}
                   </div>
@@ -2606,7 +2613,7 @@ const FinanceApp = () => {
                       >
                         <option value="all">Todas as licenças</option>
                         {tenantPlanOptions.map((plan) => (
-                          <option key={plan} value={plan}>{plan}</option>
+                          <option key={plan} value={plan}>{formatTenantPlanLabel(plan)}</option>
                         ))}
                       </select>
                       <select
@@ -2674,7 +2681,7 @@ const FinanceApp = () => {
                           <tr key={tenant.id} className="border-t border-slate-100 align-top">
                             <td className="py-4 pr-4 font-semibold text-slate-800">{tenant.name}</td>
                             <td className="py-4 pr-4 text-slate-600">{tenant.slug}</td>
-                            <td className="py-4 pr-4 text-slate-600">{tenant.plan || '-'}</td>
+                            <td className="py-4 pr-4 text-slate-600">{formatTenantPlanLabel(tenant.plan)}</td>
                             <td className="py-4 pr-4 text-slate-600">{tenant.subscription_status || '-'}</td>
                             <td className="py-4 pr-4 text-slate-600">{tenant.users_count ?? 0}</td>
                             <td className="py-4 pr-4">
