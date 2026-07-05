@@ -2117,7 +2117,7 @@ const FinanceApp = () => {
                   rows={manutencoes.filter((manutencao) => manutencao.data.slice(0, 7) === mesFiltroManutencoes).map((manutencao) => [
                     manutencao.descricao,
                     formatCurrency(manutencao.valor),
-                    new Date(manutencao.data).toLocaleDateString('pt-BR'),
+                    formatDate(manutencao.data),
                     isAdmin ? (
                       <div key={`actions-manutencao-${manutencao.id}`} className="flex items-center gap-3">
                         <SecondaryTextButton onClick={() => iniciarEdicaoManutencao(manutencao)} label="Editar" />
