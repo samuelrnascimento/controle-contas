@@ -1402,6 +1402,22 @@ const FinanceApp = () => {
     };
   }, [compras, contas, entradas, lazer, investimentos, manutencoes, mesRelatorio]);
 
+  const resumoMensal = useMemo(() => {
+    const contasMes = contas.filter((conta) => conta.mes === mesRelatorio);
+    const entradasMes = entradas.filter((entrada) => entrada.mes === mesRelatorio);
+    const investimentosMes = investimentos.filter((investimento) => investimento.mes === mesRelatorio);
+    const manutencoesMes = manutencoes.filter((manutencao) => manutencao.data.slice(0, 7) === mesRelatorio);
+    const estoqueMes = estoque.filter((item) => String(item.updated_at || '').slice(0, 7) === mesRelatorio);
+
+    return {
+      contas: contasMes.length,
+      entradas: entradasMes.length,
+      investimentos: investimentosMes.length,
+      manutencoes: manutencoesMes.length,
+      estoque: estoqueMes.length
+    };
+  }, [contas, entradas, investimentos, manutencoes, estoque, mesRelatorio]);
+
   const tenantPlanOptions = useMemo(() => {
     const options = Array.from(new Set(
       platformTenants
@@ -2882,12 +2898,13 @@ const FinanceApp = () => {
           <aside className="space-y-6">
             <div className="rounded-[28px] bg-slate-950 p-6 text-white shadow-xl shadow-slate-300/40">
               <p className="text-sm uppercase tracking-[0.30em] text-emerald-300">Resumo</p>
+              <p className="mt-2 text-xs uppercase tracking-[0.18em] text-slate-400">Mês {mesRelatorio}</p>
               <div className="mt-4 space-y-4">
-                {!isPlatformAdmin && <SummaryRow label="Contas cadastradas" value={String(contas.length)} />}
-                {!isPlatformAdmin && <SummaryRow label="Entradas cadastradas" value={String(entradas.length)} />}
-                {!isPlatformAdmin && <SummaryRow label="Investimentos" value={String(investimentos.length)} />}
-                {!isPlatformAdmin && <SummaryRow label="Extraordinárias" value={String(manutencoes.length)} />}
-                {!isPlatformAdmin && <SummaryRow label="Itens em estoque" value={String(estoque.length)} />}
+                {!isPlatformAdmin && <SummaryRow label="Contas cadastradas" value={String(resumoMensal.contas)} />}
+                {!isPlatformAdmin && <SummaryRow label="Entradas cadastradas" value={String(resumoMensal.entradas)} />}
+                {!isPlatformAdmin && <SummaryRow label="Investimentos" value={String(resumoMensal.investimentos)} />}
+                {!isPlatformAdmin && <SummaryRow label="Extraordinárias" value={String(resumoMensal.manutencoes)} />}
+                {!isPlatformAdmin && <SummaryRow label="Itens em estoque" value={String(resumoMensal.estoque)} />}
                 {isAdmin && <SummaryRow label="Usuários ativos" value={String(usuarios.filter((registeredUser) => registeredUser.active).length)} />}
                 {isPlatformAdmin && <SummaryRow label="Tenants" value={String(platformTenants.length)} />}
                 {isPlatformAdmin && <SummaryRow label="Usuários globais" value={String(platformUsers.length)} />}
