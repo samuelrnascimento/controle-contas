@@ -29,10 +29,16 @@ const API_BASE = '/api';
 const TOKEN_STORAGE_KEY = 'finansam-auth-token';
 const TENANT_VIEW_STORAGE_KEY = 'finansam-platform-tenant-view';
 const MONTHLY_VIEW_STORAGE_KEY = 'finansam-monthly-view';
+const PLATFORM_USERS_PAGE_SIZE = 10;
 const TENANT_PLANS = ['Starter', 'Smart', 'Premium'];
+const TENANT_LICENSE_TYPES = [
+  { value: 'starter_trial', label: 'Starter (Trial 7 dias)' },
+  { value: 'starter', label: 'Starter' },
+  { value: 'smart', label: 'Smart' },
+  { value: 'premium', label: 'Premium' }
+];
 const TENANT_STATUSES = [
   { value: 'active', label: 'Ativo' },
-  { value: 'trial', label: 'Trial' },
   { value: 'inactive', label: 'Inativo' }
 ];
 
@@ -137,6 +143,47 @@ const getTrialDaysRemaining = (trialExpiresAt) => {
 
   const remainingMs = expiresAt - Date.now();
   return Math.max(0, Math.ceil(remainingMs / (24 * 60 * 60 * 1000)));
+};
+
+const licenseTypeFromTenant = (plan, status) => {
+  const normalizedPlan = normalizeTenantPlan(plan);
+  const normalizedStatus = normalizeTenantStatus(status);
+
+  if (normalizedPlan === 'Starter' && normalizedStatus === 'trial') {
+    return 'starter_trial';
+  }
+
+  if (normalizedPlan === 'Starter') {
+    return 'starter';
+  }
+
+  if (normalizedPlan === 'Smart') {
+    return 'smart';
+  }
+
+  if (normalizedPlan === 'Premium') {
+    return 'premium';
+  }
+
+  return 'starter';
+};
+
+const tenantConfigFromLicenseType = (licenseType, currentStatus) => {
+  const normalizedStatus = normalizeTenantStatus(currentStatus) || 'active';
+
+  if (licenseType === 'starter_trial') {
+    return { plan: 'Starter', status: 'trial' };
+  }
+
+  if (licenseType === 'smart') {
+    return { plan: 'Smart', status: normalizedStatus === 'trial' ? 'active' : normalizedStatus };
+  }
+
+  if (licenseType === 'premium') {
+    return { plan: 'Premium', status: normalizedStatus === 'trial' ? 'active' : normalizedStatus };
+  }
+
+  return { plan: 'Starter', status: normalizedStatus === 'trial' ? 'active' : normalizedStatus };
 };
 
 const readTenantViewPreferences = () => {
@@ -501,6 +548,10 @@ const FinanceApp = () => {
   const [platformTenants, setPlatformTenants] = useState([]);
   const [platformUsers, setPlatformUsers] = useState([]);
   const [platformAdmins, setPlatformAdmins] = useState([]);
+  const [platformUsersSearchTerm, setPlatformUsersSearchTerm] = useState('');
+  const [platformUsersRoleFilter, setPlatformUsersRoleFilter] = useState('all');
+  const [platformUsersStatusFilter, setPlatformUsersStatusFilter] = useState('all');
+  const [platformUsersPage, setPlatformUsersPage] = useState(0);
   const [loading, setLoading] = useState(false);
   const [sessionLoading, setSessionLoading] = useState(Boolean(token));
   const [errorMessage, setErrorMessage] = useState('');
@@ -719,6 +770,10 @@ const FinanceApp = () => {
     setPlatformTenants([]);
     setPlatformUsers([]);
     setPlatformAdmins([]);
+    setPlatformUsersSearchTerm('');
+    setPlatformUsersRoleFilter('all');
+    setPlatformUsersStatusFilter('all');
+    setPlatformUsersPage(0);
     clearMessages();
   };
 
@@ -1156,7 +1211,7 @@ const FinanceApp = () => {
     const adminPassword = editTenantForm.adminPassword.trim();
 
     if (!firstName || !plan || !status || !phone || !email) {
-      setErrorMessage('Preencha os campos obrigatórios: Nome, Plano, Status, Telefone e Email');
+      setErrorMessage('Preencha os campos obrigatórios: Nome, Tipo de licença, Status, Telefone e Email');
       return;
     }
 
@@ -1216,7 +1271,7 @@ const FinanceApp = () => {
     const adminPassword = createTenantForm.adminPassword.trim();
 
     if (!firstName || !plan || !status || !phone || !email) {
-      setErrorMessage('Preencha os campos obrigatórios: Nome, Plano, Status, Telefone e Email');
+      setErrorMessage('Preencha os campos obrigatórios: Nome, Tipo de licença, Status, Telefone e Email');
       return;
     }
 
@@ -1260,6 +1315,28 @@ const FinanceApp = () => {
       setCreateTenantForm(emptyCreateTenantForm());
       setShowCreateTenantForm(false);
     }, 'Tenant criado com sucesso');
+  };
+
+  const updateCreateTenantLicense = (licenseType) => {
+    setCreateTenantForm((current) => {
+      const nextConfig = tenantConfigFromLicenseType(licenseType, current.status);
+      return {
+        ...current,
+        plan: nextConfig.plan,
+        status: nextConfig.status
+      };
+    });
+  };
+
+  const updateEditTenantLicense = (licenseType) => {
+    setEditTenantForm((current) => {
+      const nextConfig = tenantConfigFromLicenseType(licenseType, current.status);
+      return {
+        ...current,
+        plan: nextConfig.plan,
+        status: nextConfig.status
+      };
+    });
   };
 
   const excluirAdminPlataforma = async (adminId, adminEmail) => {
@@ -1400,6 +1477,66 @@ const FinanceApp = () => {
       && (platformUser.role === 'admin' || platformUser.role === 'owner')
     ));
   }, [platformUsers, editingTenantId]);
+
+  const platformUserRoleOptions = useMemo(() => {
+    const options = Array.from(new Set(
+      platformUsers
+        .map((registeredUser) => String(registeredUser.role || '').trim())
+        .filter(Boolean)
+    ));
+
+    return options.sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }, [platformUsers]);
+
+  const platformUsersStatusOptions = useMemo(() => {
+    const options = Array.from(new Set(
+      platformUsers
+        .map((registeredUser) => (registeredUser.active ? 'ativo' : 'inativo'))
+        .filter(Boolean)
+    ));
+
+    return options.sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }, [platformUsers]);
+
+  const filteredPlatformUsers = useMemo(() => {
+    const normalizedSearch = platformUsersSearchTerm.trim().toLowerCase();
+
+    return platformUsers.filter((registeredUser) => {
+      const role = String(registeredUser.role || '').trim();
+      const status = registeredUser.active ? 'ativo' : 'inativo';
+      const name = String(registeredUser.name || '').toLowerCase();
+      const email = String(registeredUser.email || '').toLowerCase();
+      const tenantName = String(registeredUser.tenantName || '').toLowerCase();
+      const tenantSlug = String(registeredUser.tenantSlug || '').toLowerCase();
+
+      if (platformUsersRoleFilter !== 'all' && role !== platformUsersRoleFilter) {
+        return false;
+      }
+
+      if (platformUsersStatusFilter !== 'all' && status !== platformUsersStatusFilter) {
+        return false;
+      }
+
+      if (
+        normalizedSearch
+        && !name.includes(normalizedSearch)
+        && !email.includes(normalizedSearch)
+        && !tenantName.includes(normalizedSearch)
+        && !tenantSlug.includes(normalizedSearch)
+      ) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [platformUsers, platformUsersSearchTerm, platformUsersRoleFilter, platformUsersStatusFilter]);
+
+  const platformUsersTotalPages = Math.max(1, Math.ceil(filteredPlatformUsers.length / PLATFORM_USERS_PAGE_SIZE));
+  const platformUsersCurrentPage = Math.min(platformUsersPage, platformUsersTotalPages - 1);
+  const paginatedPlatformUsers = filteredPlatformUsers.slice(
+    platformUsersCurrentPage * PLATFORM_USERS_PAGE_SIZE,
+    (platformUsersCurrentPage + 1) * PLATFORM_USERS_PAGE_SIZE
+  );
 
   const categoriasConta = useMemo(() => {
     const custom = categorias
@@ -2292,24 +2429,30 @@ const FinanceApp = () => {
                         <Field value={createTenantForm.firstName} onChange={(value) => setCreateTenantForm((current) => ({ ...current, firstName: value }))} placeholder="Nome *" />
                         <Field value={createTenantForm.lastName} onChange={(value) => setCreateTenantForm((current) => ({ ...current, lastName: value }))} placeholder="Sobrenome" />
                         <Field value={createTenantForm.company} onChange={(value) => setCreateTenantForm((current) => ({ ...current, company: value }))} placeholder="Empresa" />
-                        <select
-                          value={createTenantForm.plan}
-                          onChange={(event) => setCreateTenantForm((current) => ({ ...current, plan: event.target.value }))}
-                          className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
-                        >
-                          {TENANT_PLANS.map((planOption) => (
-                            <option key={planOption} value={planOption}>{planOption}</option>
-                          ))}
-                        </select>
-                        <select
-                          value={createTenantForm.status}
-                          onChange={(event) => setCreateTenantForm((current) => ({ ...current, status: event.target.value }))}
-                          className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
-                        >
-                          {TENANT_STATUSES.map((statusOption) => (
-                            <option key={statusOption.value} value={statusOption.value}>{statusOption.label}</option>
-                          ))}
-                        </select>
+                        <label className="block">
+                          <span className="mb-2 block text-sm font-semibold text-slate-700">Tipo de licença</span>
+                          <select
+                            value={licenseTypeFromTenant(createTenantForm.plan, createTenantForm.status)}
+                            onChange={(event) => updateCreateTenantLicense(event.target.value)}
+                            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                          >
+                            {TENANT_LICENSE_TYPES.map((licenseType) => (
+                              <option key={licenseType.value} value={licenseType.value}>{licenseType.label}</option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="block">
+                          <span className="mb-2 block text-sm font-semibold text-slate-700">Status</span>
+                          <select
+                            value={normalizeTenantStatus(createTenantForm.status) === 'trial' ? 'active' : createTenantForm.status}
+                            onChange={(event) => setCreateTenantForm((current) => ({ ...current, status: event.target.value }))}
+                            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                          >
+                            {TENANT_STATUSES.map((statusOption) => (
+                              <option key={statusOption.value} value={statusOption.value}>{statusOption.label}</option>
+                            ))}
+                          </select>
+                        </label>
                         <Field value={createTenantForm.phone} onChange={(value) => setCreateTenantForm((current) => ({ ...current, phone: value }))} placeholder="Telefone *" />
                         <Field type="email" value={createTenantForm.email} onChange={(value) => setCreateTenantForm((current) => ({ ...current, email: value }))} placeholder="Email *" />
                       </div>
@@ -2370,24 +2513,30 @@ const FinanceApp = () => {
                       <Field value={editTenantForm.firstName} onChange={(value) => setEditTenantForm((current) => ({ ...current, firstName: value }))} placeholder="Nome *" />
                       <Field value={editTenantForm.lastName} onChange={(value) => setEditTenantForm((current) => ({ ...current, lastName: value }))} placeholder="Sobrenome" />
                       <Field value={editTenantForm.company} onChange={(value) => setEditTenantForm((current) => ({ ...current, company: value }))} placeholder="Empresa" />
-                      <select
-                        value={editTenantForm.plan}
-                        onChange={(event) => setEditTenantForm((current) => ({ ...current, plan: event.target.value }))}
-                        className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
-                      >
-                        {TENANT_PLANS.map((planOption) => (
-                          <option key={planOption} value={planOption}>{planOption}</option>
-                        ))}
-                      </select>
-                      <select
-                        value={editTenantForm.status}
-                        onChange={(event) => setEditTenantForm((current) => ({ ...current, status: event.target.value }))}
-                        className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
-                      >
-                        {TENANT_STATUSES.map((statusOption) => (
-                          <option key={statusOption.value} value={statusOption.value}>{statusOption.label}</option>
-                        ))}
-                      </select>
+                      <label className="block">
+                        <span className="mb-2 block text-sm font-semibold text-slate-700">Tipo de licença</span>
+                        <select
+                          value={licenseTypeFromTenant(editTenantForm.plan, editTenantForm.status)}
+                          onChange={(event) => updateEditTenantLicense(event.target.value)}
+                          className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                        >
+                          {TENANT_LICENSE_TYPES.map((licenseType) => (
+                            <option key={licenseType.value} value={licenseType.value}>{licenseType.label}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="block">
+                        <span className="mb-2 block text-sm font-semibold text-slate-700">Status</span>
+                        <select
+                          value={normalizeTenantStatus(editTenantForm.status) === 'trial' ? 'active' : editTenantForm.status}
+                          onChange={(event) => setEditTenantForm((current) => ({ ...current, status: event.target.value }))}
+                          className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                        >
+                          {TENANT_STATUSES.map((statusOption) => (
+                            <option key={statusOption.value} value={statusOption.value}>{statusOption.label}</option>
+                          ))}
+                        </select>
+                      </label>
                       <Field value={editTenantForm.phone} onChange={(value) => setEditTenantForm((current) => ({ ...current, phone: value }))} placeholder="Telefone *" />
                       <Field type="email" value={editTenantForm.email} onChange={(value) => setEditTenantForm((current) => ({ ...current, email: value }))} placeholder="Email *" />
                     </div>
@@ -2455,7 +2604,7 @@ const FinanceApp = () => {
                         onChange={(event) => setTenantPlanFilter(event.target.value)}
                         className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
                       >
-                        <option value="all">Todos os planos</option>
+                        <option value="all">Todas as licenças</option>
                         {tenantPlanOptions.map((plan) => (
                           <option key={plan} value={plan}>{plan}</option>
                         ))}
@@ -2504,7 +2653,7 @@ const FinanceApp = () => {
                               onClick={() => toggleTenantSort('plan')}
                               className="inline-flex items-center gap-1 transition hover:text-slate-800"
                             >
-                              Plano <span>{sortIndicator('plan')}</span>
+                              Licença <span>{sortIndicator('plan')}</span>
                             </button>
                           </th>
                           <th className="pb-3 pr-4 font-semibold">
@@ -2608,7 +2757,53 @@ const FinanceApp = () => {
 
                 <div className="mt-6 rounded-[28px] border border-slate-200/80 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] shadow-[0_12px_35px_rgba(15,23,42,0.05)]">
                   <div className="border-b border-slate-200 px-5 py-4">
-                    <h3 className="text-lg font-bold">Usuários da plataforma</h3>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <h3 className="text-lg font-bold">Usuários da plataforma</h3>
+                      <span className="text-sm font-semibold text-slate-600">
+                        {filteredPlatformUsers.length} de {platformUsers.length} usuários
+                      </span>
+                    </div>
+                    <div className="mt-4 grid gap-3 md:grid-cols-[1.4fr_0.8fr_0.8fr_auto]">
+                      <input
+                        type="text"
+                        value={platformUsersSearchTerm}
+                        onChange={(event) => setPlatformUsersSearchTerm(event.target.value)}
+                        placeholder="Buscar por nome, e-mail, tenant ou slug"
+                        className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                      />
+                      <select
+                        value={platformUsersRoleFilter}
+                        onChange={(event) => setPlatformUsersRoleFilter(event.target.value)}
+                        className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                      >
+                        <option value="all">Todos os papéis</option>
+                        {platformUserRoleOptions.map((role) => (
+                          <option key={role} value={role}>{role}</option>
+                        ))}
+                      </select>
+                      <select
+                        value={platformUsersStatusFilter}
+                        onChange={(event) => setPlatformUsersStatusFilter(event.target.value)}
+                        className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                      >
+                        <option value="all">Todos os status</option>
+                        {platformUsersStatusOptions.map((status) => (
+                          <option key={status} value={status}>{status}</option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPlatformUsersSearchTerm('');
+                          setPlatformUsersRoleFilter('all');
+                          setPlatformUsersStatusFilter('all');
+                          setPlatformUsersPage(0);
+                        }}
+                        className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                      >
+                        Limpar filtros
+                      </button>
+                    </div>
                   </div>
                   <div className="overflow-x-auto px-5 py-4">
                     <table className="min-w-full text-left text-sm">
@@ -2623,7 +2818,7 @@ const FinanceApp = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        {platformUsers.map((registeredUser) => (
+                        {paginatedPlatformUsers.map((registeredUser) => (
                           <tr key={registeredUser.id} className="border-t border-slate-100 align-top">
                             <td className="py-4 pr-4 font-semibold text-slate-800">{registeredUser.name}</td>
                             <td className="py-4 pr-4 text-slate-600">{registeredUser.email}</td>
@@ -2641,13 +2836,36 @@ const FinanceApp = () => {
                             </td>
                           </tr>
                         ))}
-                        {platformUsers.length === 0 && (
+                        {filteredPlatformUsers.length === 0 && (
                           <tr>
-                            <td className="py-5 text-center text-slate-500" colSpan={6}>Nenhum usuário encontrado</td>
+                            <td className="py-5 text-center text-slate-500" colSpan={6}>Nenhum usuário encontrado com os filtros atuais</td>
                           </tr>
                         )}
                       </tbody>
                     </table>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-5 py-4">
+                    <p className="text-sm text-slate-600">
+                      Página {platformUsersCurrentPage + 1} de {platformUsersTotalPages}
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setPlatformUsersPage((current) => Math.max(0, current - 1))}
+                        disabled={platformUsersCurrentPage === 0}
+                        className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        ← Anterior 10
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPlatformUsersPage((current) => Math.min(platformUsersTotalPages - 1, current + 1))}
+                        disabled={platformUsersCurrentPage >= platformUsersTotalPages - 1}
+                        className="rounded-xl bg-slate-950 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Próximos 10 →
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
