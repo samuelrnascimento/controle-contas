@@ -2898,7 +2898,25 @@ const FinanceApp = () => {
           <aside className="space-y-6">
             <div className="rounded-[28px] bg-slate-950 p-6 text-white shadow-xl shadow-slate-300/40">
               <p className="text-sm uppercase tracking-[0.30em] text-emerald-300">Resumo</p>
-              <p className="mt-2 text-xs uppercase tracking-[0.18em] text-slate-400">Mês {mesRelatorio}</p>
+              <div className="mt-2 flex items-center justify-between gap-2">
+                <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Mês {mesRelatorio}</p>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setMesRelatorio(getPreviousMonth(mesRelatorio))}
+                    className="rounded-lg border border-white/15 px-2 py-1 text-xs font-semibold text-slate-200 transition hover:bg-white/10"
+                  >
+                    ←
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMesRelatorio(getNextMonth(mesRelatorio))}
+                    className="rounded-lg border border-white/15 px-2 py-1 text-xs font-semibold text-slate-200 transition hover:bg-white/10"
+                  >
+                    →
+                  </button>
+                </div>
+              </div>
               <div className="mt-4 space-y-4">
                 {!isPlatformAdmin && <SummaryRow label="Contas cadastradas" value={String(resumoMensal.contas)} />}
                 {!isPlatformAdmin && <SummaryRow label="Entradas cadastradas" value={String(resumoMensal.entradas)} />}
