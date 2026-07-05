@@ -174,6 +174,16 @@ const parseAmount = (value) => {
   return Number.isFinite(amount) ? amount : null;
 };
 
+const normalizeMonthValue = (value) => {
+  const normalized = String(value || '').trim();
+  return /^\d{4}-\d{2}$/.test(normalized) ? normalized : null;
+};
+
+const normalizeDateValue = (value) => {
+  const normalized = String(value || '').trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : null;
+};
+
 const normalizeCategoryScope = (value) => {
   const normalized = String(value || '').trim().toLowerCase();
   return allowedCategoryScopes.includes(normalized) ? normalized : null;
@@ -308,6 +318,11 @@ const ensureSchema = async () => {
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
+    ALTER TABLE contas ADD COLUMN IF NOT EXISTS data DATE;
+    UPDATE contas
+    SET data = TO_DATE(mes || '-01', 'YYYY-MM-DD')
+    WHERE data IS NULL AND mes ~ '^\\d{4}-\\d{2}$';
+
     CREATE TABLE IF NOT EXISTS entradas (
       id SERIAL PRIMARY KEY,
       tipo VARCHAR(120) NOT NULL,
@@ -320,6 +335,10 @@ const ensureSchema = async () => {
     ALTER TABLE entradas ADD COLUMN IF NOT EXISTS tenant_id TEXT;
     ALTER TABLE entradas ALTER COLUMN tenant_id TYPE TEXT USING tenant_id::text;
     ALTER TABLE entradas ADD COLUMN IF NOT EXISTS nota TEXT;
+    ALTER TABLE entradas ADD COLUMN IF NOT EXISTS data DATE;
+    UPDATE entradas
+    SET data = TO_DATE(mes || '-01', 'YYYY-MM-DD')
+    WHERE data IS NULL AND mes ~ '^\\d{4}-\\d{2}$';
 
     CREATE TABLE IF NOT EXISTS lazer (
       id SERIAL PRIMARY KEY,
@@ -331,6 +350,10 @@ const ensureSchema = async () => {
 
     ALTER TABLE lazer ADD COLUMN IF NOT EXISTS tenant_id TEXT;
     ALTER TABLE lazer ALTER COLUMN tenant_id TYPE TEXT USING tenant_id::text;
+    ALTER TABLE lazer ADD COLUMN IF NOT EXISTS data DATE;
+    UPDATE lazer
+    SET data = TO_DATE(mes || '-01', 'YYYY-MM-DD')
+    WHERE data IS NULL AND mes ~ '^\\d{4}-\\d{2}$';
 
     CREATE TABLE IF NOT EXISTS manutencoes (
       id SERIAL PRIMARY KEY,
@@ -351,6 +374,10 @@ const ensureSchema = async () => {
     ALTER TABLE investimentos ADD COLUMN IF NOT EXISTS tenant_id TEXT;
     ALTER TABLE investimentos ALTER COLUMN tenant_id TYPE TEXT USING tenant_id::text;
     ALTER TABLE investimentos ADD COLUMN IF NOT EXISTS nota TEXT;
+    ALTER TABLE investimentos ADD COLUMN IF NOT EXISTS data DATE;
+    UPDATE investimentos
+    SET data = TO_DATE(mes || '-01', 'YYYY-MM-DD')
+    WHERE data IS NULL AND mes ~ '^\\d{4}-\\d{2}$';
 
     CREATE TABLE IF NOT EXISTS categorias (
       id SERIAL PRIMARY KEY,
@@ -1324,22 +1351,24 @@ app.get('/api/entradas', authenticateToken, requireTenantScope, async (req, res)
 });
 
 app.post('/api/entradas', authenticateToken, requireTenantScope, async (req, res) => {
-  const { tipo, valor, mes, nota } = req.body;
+  const { tipo, valor, mes, data, nota } = req.body;
   const valorNumerico = parseAmount(valor);
+  const dataNormalizada = normalizeDateValue(data);
+  const mesNormalizado = normalizeMonthValue(mes) || (dataNormalizada ? dataNormalizada.slice(0, 7) : null);
 
-  if (!tipo || !mes || valorNumerico === null) {
+  if (!tipo || !mesNormalizado || !dataNormalizada || valorNumerico === null) {
     return res.status(400).json({ error: 'Dados de entrada inválidos' });
   }
 
   try {
     const result = runtimeCapabilities.hasEntradasTenantId
       ? await pool.query(
-        'INSERT INTO entradas (tenant_id, tipo, valor, mes, nota) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-        [req.user.tenant_id, tipo, valorNumerico, mes, nota || null]
+        'INSERT INTO entradas (tenant_id, tipo, valor, mes, data, nota) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+        [req.user.tenant_id, tipo, valorNumerico, mesNormalizado, dataNormalizada, nota || null]
       )
       : await pool.query(
-        'INSERT INTO entradas (tipo, valor, mes, nota) VALUES ($1, $2, $3, $4) RETURNING *',
-        [tipo, valorNumerico, mes, nota || null]
+        'INSERT INTO entradas (tipo, valor, mes, data, nota) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+        [tipo, valorNumerico, mesNormalizado, dataNormalizada, nota || null]
       );
 
     res.status(201).json(result.rows[0]);
@@ -1349,10 +1378,12 @@ app.post('/api/entradas', authenticateToken, requireTenantScope, async (req, res
 });
 
 app.patch('/api/entradas/:id', authenticateToken, requireTenantScope, requireRole('admin'), async (req, res) => {
-  const { tipo, valor, mes, nota } = req.body;
+  const { tipo, valor, mes, data, nota } = req.body;
   const valorNumerico = parseAmount(valor);
+  const dataNormalizada = normalizeDateValue(data);
+  const mesNormalizado = normalizeMonthValue(mes) || (dataNormalizada ? dataNormalizada.slice(0, 7) : null);
 
-  if (!tipo || !mes || valorNumerico === null) {
+  if (!tipo || !mesNormalizado || !dataNormalizada || valorNumerico === null) {
     return res.status(400).json({ error: 'Dados de entrada inválidos' });
   }
 
@@ -1360,17 +1391,17 @@ app.patch('/api/entradas/:id', authenticateToken, requireTenantScope, requireRol
     const result = runtimeCapabilities.hasEntradasTenantId
       ? await pool.query(
         `UPDATE entradas
-         SET tipo = $1, valor = $2, mes = $3, nota = $4
-         WHERE id::text = $5 AND tenant_id = $6
+         SET tipo = $1, valor = $2, mes = $3, data = $4, nota = $5
+         WHERE id::text = $6 AND tenant_id = $7
          RETURNING *`,
-        [tipo, valorNumerico, mes, nota || null, req.params.id, req.user.tenant_id]
+        [tipo, valorNumerico, mesNormalizado, dataNormalizada, nota || null, req.params.id, req.user.tenant_id]
       )
       : await pool.query(
         `UPDATE entradas
-         SET tipo = $1, valor = $2, mes = $3, nota = $4
-         WHERE id::text = $5
+         SET tipo = $1, valor = $2, mes = $3, data = $4, nota = $5
+         WHERE id::text = $6
          RETURNING *`,
-        [tipo, valorNumerico, mes, nota || null, req.params.id]
+        [tipo, valorNumerico, mesNormalizado, dataNormalizada, nota || null, req.params.id]
       );
 
     if (result.rows.length === 0) {
@@ -1410,22 +1441,24 @@ app.get('/api/contas', authenticateToken, requireTenantScope, async (req, res) =
 });
 
 app.post('/api/contas', authenticateToken, requireTenantScope, async (req, res) => {
-  const { tipo, valor, mes } = req.body;
+  const { tipo, valor, mes, data } = req.body;
   const valorNumerico = parseAmount(valor);
+  const dataNormalizada = normalizeDateValue(data);
+  const mesNormalizado = normalizeMonthValue(mes) || (dataNormalizada ? dataNormalizada.slice(0, 7) : null);
 
-  if (!tipo || !mes || valorNumerico === null) {
+  if (!tipo || !mesNormalizado || !dataNormalizada || valorNumerico === null) {
     return res.status(400).json({ error: 'Dados de conta inválidos' });
   }
 
   try {
     const result = runtimeCapabilities.hasContasTenantId
       ? await pool.query(
-        'INSERT INTO contas (tenant_id, tipo, valor, mes) VALUES ($1, $2, $3, $4) RETURNING *',
-        [req.user.tenant_id, tipo, valorNumerico, mes]
+        'INSERT INTO contas (tenant_id, tipo, valor, mes, data) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+        [req.user.tenant_id, tipo, valorNumerico, mesNormalizado, dataNormalizada]
       )
       : await pool.query(
-        'INSERT INTO contas (tipo, valor, mes) VALUES ($1, $2, $3) RETURNING *',
-        [tipo, valorNumerico, mes]
+        'INSERT INTO contas (tipo, valor, mes, data) VALUES ($1, $2, $3, $4) RETURNING *',
+        [tipo, valorNumerico, mesNormalizado, dataNormalizada]
       );
 
     res.status(201).json(result.rows[0]);
@@ -1435,10 +1468,12 @@ app.post('/api/contas', authenticateToken, requireTenantScope, async (req, res) 
 });
 
 app.patch('/api/contas/:id', authenticateToken, requireTenantScope, requireRole('admin'), async (req, res) => {
-  const { tipo, valor, mes } = req.body;
+  const { tipo, valor, mes, data } = req.body;
   const valorNumerico = parseAmount(valor);
+  const dataNormalizada = normalizeDateValue(data);
+  const mesNormalizado = normalizeMonthValue(mes) || (dataNormalizada ? dataNormalizada.slice(0, 7) : null);
 
-  if (!tipo || !mes || valorNumerico === null) {
+  if (!tipo || !mesNormalizado || !dataNormalizada || valorNumerico === null) {
     return res.status(400).json({ error: 'Dados de conta inválidos' });
   }
 
@@ -1446,17 +1481,17 @@ app.patch('/api/contas/:id', authenticateToken, requireTenantScope, requireRole(
     const result = runtimeCapabilities.hasContasTenantId
       ? await pool.query(
         `UPDATE contas
-         SET tipo = $1, valor = $2, mes = $3
-         WHERE id::text = $4 AND tenant_id = $5
+         SET tipo = $1, valor = $2, mes = $3, data = $4
+         WHERE id::text = $5 AND tenant_id = $6
          RETURNING *`,
-        [tipo, valorNumerico, mes, req.params.id, req.user.tenant_id]
+        [tipo, valorNumerico, mesNormalizado, dataNormalizada, req.params.id, req.user.tenant_id]
       )
       : await pool.query(
         `UPDATE contas
-         SET tipo = $1, valor = $2, mes = $3
-         WHERE id::text = $4
+         SET tipo = $1, valor = $2, mes = $3, data = $4
+         WHERE id::text = $5
          RETURNING *`,
-        [tipo, valorNumerico, mes, req.params.id]
+        [tipo, valorNumerico, mesNormalizado, dataNormalizada, req.params.id]
       );
 
     if (result.rows.length === 0) {
@@ -1496,22 +1531,24 @@ app.get('/api/lazer', authenticateToken, requireTenantScope, async (req, res) =>
 });
 
 app.post('/api/lazer', authenticateToken, requireTenantScope, async (req, res) => {
-  const { descricao, valor, mes } = req.body;
+  const { descricao, valor, mes, data } = req.body;
   const valorNumerico = parseAmount(valor);
+  const dataNormalizada = normalizeDateValue(data);
+  const mesNormalizado = normalizeMonthValue(mes) || (dataNormalizada ? dataNormalizada.slice(0, 7) : null);
 
-  if (!descricao || !mes || valorNumerico === null) {
+  if (!descricao || !mesNormalizado || !dataNormalizada || valorNumerico === null) {
     return res.status(400).json({ error: 'Dados de despesa de lazer inválidos' });
   }
 
   try {
     const result = runtimeCapabilities.hasLazerTenantId
       ? await pool.query(
-        'INSERT INTO lazer (tenant_id, descricao, valor, mes) VALUES ($1, $2, $3, $4) RETURNING *',
-        [req.user.tenant_id, descricao, valorNumerico, mes]
+        'INSERT INTO lazer (tenant_id, descricao, valor, mes, data) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+        [req.user.tenant_id, descricao, valorNumerico, mesNormalizado, dataNormalizada]
       )
       : await pool.query(
-        'INSERT INTO lazer (descricao, valor, mes) VALUES ($1, $2, $3) RETURNING *',
-        [descricao, valorNumerico, mes]
+        'INSERT INTO lazer (descricao, valor, mes, data) VALUES ($1, $2, $3, $4) RETURNING *',
+        [descricao, valorNumerico, mesNormalizado, dataNormalizada]
       );
 
     res.status(201).json(result.rows[0]);
@@ -1521,10 +1558,12 @@ app.post('/api/lazer', authenticateToken, requireTenantScope, async (req, res) =
 });
 
 app.patch('/api/lazer/:id', authenticateToken, requireTenantScope, requireRole('admin'), async (req, res) => {
-  const { descricao, valor, mes } = req.body;
+  const { descricao, valor, mes, data } = req.body;
   const valorNumerico = parseAmount(valor);
+  const dataNormalizada = normalizeDateValue(data);
+  const mesNormalizado = normalizeMonthValue(mes) || (dataNormalizada ? dataNormalizada.slice(0, 7) : null);
 
-  if (!descricao || !mes || valorNumerico === null) {
+  if (!descricao || !mesNormalizado || !dataNormalizada || valorNumerico === null) {
     return res.status(400).json({ error: 'Dados de despesa de lazer inválidos' });
   }
 
@@ -1532,17 +1571,17 @@ app.patch('/api/lazer/:id', authenticateToken, requireTenantScope, requireRole('
     const result = runtimeCapabilities.hasLazerTenantId
       ? await pool.query(
         `UPDATE lazer
-         SET descricao = $1, valor = $2, mes = $3
-         WHERE id::text = $4 AND tenant_id = $5
+         SET descricao = $1, valor = $2, mes = $3, data = $4
+         WHERE id::text = $5 AND tenant_id = $6
          RETURNING *`,
-        [descricao, valorNumerico, mes, req.params.id, req.user.tenant_id]
+        [descricao, valorNumerico, mesNormalizado, dataNormalizada, req.params.id, req.user.tenant_id]
       )
       : await pool.query(
         `UPDATE lazer
-         SET descricao = $1, valor = $2, mes = $3
-         WHERE id::text = $4
+         SET descricao = $1, valor = $2, mes = $3, data = $4
+         WHERE id::text = $5
          RETURNING *`,
-        [descricao, valorNumerico, mes, req.params.id]
+        [descricao, valorNumerico, mesNormalizado, dataNormalizada, req.params.id]
       );
 
     if (result.rows.length === 0) {
@@ -1668,22 +1707,24 @@ app.get('/api/investimentos', authenticateToken, requireTenantScope, async (req,
 });
 
 app.post('/api/investimentos', authenticateToken, requireTenantScope, async (req, res) => {
-  const { descricao, valor, mes, nota } = req.body;
+  const { descricao, valor, mes, data, nota } = req.body;
   const valorNumerico = parseAmount(valor);
+  const dataNormalizada = normalizeDateValue(data);
+  const mesNormalizado = normalizeMonthValue(mes) || (dataNormalizada ? dataNormalizada.slice(0, 7) : null);
 
-  if (!descricao || !mes || valorNumerico === null) {
+  if (!descricao || !mesNormalizado || !dataNormalizada || valorNumerico === null) {
     return res.status(400).json({ error: 'Dados de investimento inválidos' });
   }
 
   try {
     const result = runtimeCapabilities.hasInvestimentosTenantId
       ? await pool.query(
-        'INSERT INTO investimentos (tenant_id, descricao, valor, mes, nota) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-        [req.user.tenant_id, descricao, valorNumerico, mes, nota || null]
+        'INSERT INTO investimentos (tenant_id, descricao, valor, mes, data, nota) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+        [req.user.tenant_id, descricao, valorNumerico, mesNormalizado, dataNormalizada, nota || null]
       )
       : await pool.query(
-        'INSERT INTO investimentos (descricao, valor, mes, nota) VALUES ($1, $2, $3, $4) RETURNING *',
-        [descricao, valorNumerico, mes, nota || null]
+        'INSERT INTO investimentos (descricao, valor, mes, data, nota) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+        [descricao, valorNumerico, mesNormalizado, dataNormalizada, nota || null]
       );
 
     res.status(201).json(result.rows[0]);
@@ -1693,10 +1734,12 @@ app.post('/api/investimentos', authenticateToken, requireTenantScope, async (req
 });
 
 app.patch('/api/investimentos/:id', authenticateToken, requireTenantScope, requireRole('admin'), async (req, res) => {
-  const { descricao, valor, mes, nota } = req.body;
+  const { descricao, valor, mes, data, nota } = req.body;
   const valorNumerico = parseAmount(valor);
+  const dataNormalizada = normalizeDateValue(data);
+  const mesNormalizado = normalizeMonthValue(mes) || (dataNormalizada ? dataNormalizada.slice(0, 7) : null);
 
-  if (!descricao || !mes || valorNumerico === null) {
+  if (!descricao || !mesNormalizado || !dataNormalizada || valorNumerico === null) {
     return res.status(400).json({ error: 'Dados de investimento inválidos' });
   }
 
@@ -1704,17 +1747,17 @@ app.patch('/api/investimentos/:id', authenticateToken, requireTenantScope, requi
     const result = runtimeCapabilities.hasInvestimentosTenantId
       ? await pool.query(
         `UPDATE investimentos
-         SET descricao = $1, valor = $2, mes = $3, nota = $4
-         WHERE id::text = $5 AND tenant_id = $6
+         SET descricao = $1, valor = $2, mes = $3, data = $4, nota = $5
+         WHERE id::text = $6 AND tenant_id = $7
          RETURNING *`,
-        [descricao, valorNumerico, mes, nota || null, req.params.id, req.user.tenant_id]
+        [descricao, valorNumerico, mesNormalizado, dataNormalizada, nota || null, req.params.id, req.user.tenant_id]
       )
       : await pool.query(
         `UPDATE investimentos
-         SET descricao = $1, valor = $2, mes = $3, nota = $4
-         WHERE id::text = $5
+         SET descricao = $1, valor = $2, mes = $3, data = $4, nota = $5
+         WHERE id::text = $6
          RETURNING *`,
-        [descricao, valorNumerico, mes, nota || null, req.params.id]
+        [descricao, valorNumerico, mesNormalizado, dataNormalizada, nota || null, req.params.id]
       );
 
     if (result.rows.length === 0) {

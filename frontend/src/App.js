@@ -45,11 +45,11 @@ const defaultMonth = new Date().toISOString().slice(0, 7);
 const defaultDate = new Date().toISOString().slice(0, 10);
 
 const emptyCompra = () => ({ item: '', quantidade: '', valor: '', mes: defaultMonth });
-const emptyConta = () => ({ tipo: '', valor: '', mes: defaultMonth });
-const emptyEntrada = () => ({ tipo: '', valor: '', mes: defaultMonth, nota: '' });
-const emptyLazer = () => ({ descricao: '', valor: '', mes: defaultMonth });
+const emptyConta = () => ({ tipo: '', valor: '', data: defaultDate });
+const emptyEntrada = () => ({ tipo: '', valor: '', data: defaultDate, nota: '' });
+const emptyLazer = () => ({ descricao: '', valor: '', data: defaultDate });
 const emptyManutencao = () => ({ descricao: '', valor: '', data: defaultDate });
-const emptyInvestimento = () => ({ descricao: '', valor: '', mes: defaultMonth, nota: '' });
+const emptyInvestimento = () => ({ descricao: '', valor: '', data: defaultDate, nota: '' });
 const emptyNovoUsuario = () => ({ name: '', email: '', password: '' });
 const emptyCreateTenantForm = () => ({
   firstName: '',
@@ -86,6 +86,37 @@ const emptyPublicSignupForm = () => ({
 });
 const defaultTenantSort = () => ({ key: 'name', direction: 'asc' });
 const isMonthValueValid = (value) => /^\d{4}-\d{2}$/.test(String(value || ''));
+const isDateValueValid = (value) => /^\d{4}-\d{2}-\d{2}$/.test(String(value || ''));
+const getRecordMonth = (record) => {
+  const data = String(record?.data || '').slice(0, 10);
+
+  if (isDateValueValid(data)) {
+    return data.slice(0, 7);
+  }
+
+  const mes = String(record?.mes || '').slice(0, 7);
+  return isMonthValueValid(mes) ? mes : null;
+};
+const getRecordDate = (record) => {
+  const data = String(record?.data || '').slice(0, 10);
+
+  if (isDateValueValid(data)) {
+    return data;
+  }
+
+  const mes = getRecordMonth(record);
+  return mes ? `${mes}-01` : defaultDate;
+};
+const formatDate = (value) => {
+  const data = String(value || '').slice(0, 10);
+
+  if (!isDateValueValid(data)) {
+    return '-';
+  }
+
+  const [year, month, day] = data.split('-');
+  return `${day}/${month}/${year}`;
+};
 const normalizeTenantSlug = (value) => String(value || '')
   .trim()
   .toLowerCase()
@@ -875,7 +906,7 @@ const FinanceApp = () => {
   };
 
   const adicionarConta = async () => {
-    if (!novaConta.valor || !novaConta.mes || !novaConta.tipo) {
+    if (!novaConta.valor || !novaConta.data || !novaConta.tipo) {
       setErrorMessage('Preencha todos os campos da conta');
       return;
     }
@@ -898,7 +929,7 @@ const FinanceApp = () => {
   };
 
   const adicionarLazer = async () => {
-    if (!novoLazer.descricao || !novoLazer.valor || !novoLazer.mes) {
+    if (!novoLazer.descricao || !novoLazer.valor || !novoLazer.data) {
       setErrorMessage('Preencha todos os campos de lazer');
       return;
     }
@@ -921,7 +952,7 @@ const FinanceApp = () => {
   };
 
   const adicionarEntrada = async () => {
-    if (!novaEntrada.valor || !novaEntrada.mes || !novaEntrada.tipo) {
+    if (!novaEntrada.valor || !novaEntrada.data || !novaEntrada.tipo) {
       setErrorMessage('Preencha todos os campos da entrada');
       return;
     }
@@ -967,7 +998,7 @@ const FinanceApp = () => {
   };
 
   const adicionarInvestimento = async () => {
-    if (!novoInvestimento.descricao || !novoInvestimento.valor || !novoInvestimento.mes) {
+    if (!novoInvestimento.descricao || !novoInvestimento.valor || !novoInvestimento.data) {
       setErrorMessage('Preencha todos os campos do investimento');
       return;
     }
@@ -999,7 +1030,7 @@ const FinanceApp = () => {
   const iniciarEdicaoConta = (conta) => {
     setActiveTab('contas');
     setEditingContaId(conta.id);
-    setNovaConta({ tipo: conta.tipo || '', valor: String(conta.valor ?? ''), mes: conta.mes || defaultMonth });
+    setNovaConta({ tipo: conta.tipo || '', valor: String(conta.valor ?? ''), data: getRecordDate(conta) });
     clearMessages();
   };
 
@@ -1009,7 +1040,7 @@ const FinanceApp = () => {
     setNovaEntrada({
       tipo: entrada.tipo || '',
       valor: String(entrada.valor ?? ''),
-      mes: entrada.mes || defaultMonth,
+      data: getRecordDate(entrada),
       nota: entrada.nota || ''
     });
     clearMessages();
@@ -1018,7 +1049,7 @@ const FinanceApp = () => {
   const iniciarEdicaoLazer = (item) => {
     setActiveTab('lazer');
     setEditingLazerId(item.id);
-    setNovoLazer({ descricao: item.descricao || '', valor: String(item.valor ?? ''), mes: item.mes || defaultMonth });
+    setNovoLazer({ descricao: item.descricao || '', valor: String(item.valor ?? ''), data: getRecordDate(item) });
     clearMessages();
   };
 
@@ -1039,7 +1070,7 @@ const FinanceApp = () => {
     setNovoInvestimento({
       descricao: investimento.descricao || '',
       valor: String(investimento.valor ?? ''),
-      mes: investimento.mes || defaultMonth,
+      data: getRecordDate(investimento),
       nota: investimento.nota || ''
     });
     clearMessages();
@@ -1363,10 +1394,10 @@ const FinanceApp = () => {
 
   const relatorio = useMemo(() => {
     const comprasMes = compras.filter((compra) => compra.mes === mesRelatorio);
-    const contasMes = contas.filter((conta) => conta.mes === mesRelatorio);
-    const entradasMes = entradas.filter((entrada) => entrada.mes === mesRelatorio);
-    const lazerMes = lazer.filter((item) => item.mes === mesRelatorio);
-    const investimentosMes = investimentos.filter((investimento) => investimento.mes === mesRelatorio);
+    const contasMes = contas.filter((conta) => getRecordMonth(conta) === mesRelatorio);
+    const entradasMes = entradas.filter((entrada) => getRecordMonth(entrada) === mesRelatorio);
+    const lazerMes = lazer.filter((item) => getRecordMonth(item) === mesRelatorio);
+    const investimentosMes = investimentos.filter((investimento) => getRecordMonth(investimento) === mesRelatorio);
     const manutencoesMes = manutencoes.filter((manutencao) => manutencao.data.slice(0, 7) === mesRelatorio);
 
     const totalEntradas = entradasMes.reduce((acc, entrada) => acc + Number(entrada.valor), 0);
@@ -1403,9 +1434,9 @@ const FinanceApp = () => {
   }, [compras, contas, entradas, lazer, investimentos, manutencoes, mesRelatorio]);
 
   const resumoMensal = useMemo(() => {
-    const contasMes = contas.filter((conta) => conta.mes === mesRelatorio);
-    const entradasMes = entradas.filter((entrada) => entrada.mes === mesRelatorio);
-    const investimentosMes = investimentos.filter((investimento) => investimento.mes === mesRelatorio);
+    const contasMes = contas.filter((conta) => getRecordMonth(conta) === mesRelatorio);
+    const entradasMes = entradas.filter((entrada) => getRecordMonth(entrada) === mesRelatorio);
+    const investimentosMes = investimentos.filter((investimento) => getRecordMonth(investimento) === mesRelatorio);
     const manutencoesMes = manutencoes.filter((manutencao) => manutencao.data.slice(0, 7) === mesRelatorio);
     const estoqueMes = estoque.filter((item) => String(item.updated_at || '').slice(0, 7) === mesRelatorio);
 
@@ -1939,7 +1970,7 @@ const FinanceApp = () => {
                     ))}
                   </select>
                   <Field type="number" value={novaConta.valor} onChange={(value) => setNovaConta((current) => ({ ...current, valor: value }))} placeholder="Valor" />
-                  <Field type="month" value={novaConta.mes} onChange={(value) => setNovaConta((current) => ({ ...current, mes: value }))} />
+                  <Field type="date" value={novaConta.data} onChange={(value) => setNovaConta((current) => ({ ...current, data: value }))} />
                   <PrimaryButton icon={editingContaId ? Pencil : PlusCircle} onClick={adicionarConta} disabled={loading || categoriasConta.length === 0} label={editingContaId ? 'Salvar alterações' : 'Adicionar'} />
                 </div>
                 {editingContaId && (
@@ -1949,11 +1980,11 @@ const FinanceApp = () => {
                 )}
                 <FilterMonth value={mesFiltroContas} onChange={setMesFiltroContas} />
                 <DataTable
-                  headers={['Tipo', 'Valor', 'Mês', 'Ações']}
-                  rows={contas.filter((conta) => conta.mes === mesFiltroContas).map((conta) => [
+                  headers={['Tipo', 'Valor', 'Data', 'Ações']}
+                  rows={contas.filter((conta) => getRecordMonth(conta) === mesFiltroContas).map((conta) => [
                     conta.tipo,
                     formatCurrency(conta.valor),
-                    conta.mes,
+                    formatDate(getRecordDate(conta)),
                     isAdmin ? (
                       <div key={`actions-conta-${conta.id}`} className="flex items-center gap-3">
                         <SecondaryTextButton onClick={() => iniciarEdicaoConta(conta)} label="Editar" />
@@ -1989,7 +2020,7 @@ const FinanceApp = () => {
                       ))}
                     </select>
                     <Field type="number" value={novaEntrada.valor} onChange={(value) => setNovaEntrada((current) => ({ ...current, valor: value }))} placeholder="Valor" />
-                    <Field type="month" value={novaEntrada.mes} onChange={(value) => setNovaEntrada((current) => ({ ...current, mes: value }))} />
+                    <Field type="date" value={novaEntrada.data} onChange={(value) => setNovaEntrada((current) => ({ ...current, data: value }))} />
                     <PrimaryButton icon={editingEntradaId ? Pencil : PlusCircle} onClick={adicionarEntrada} disabled={loading || categoriasEntrada.length === 0} label={editingEntradaId ? 'Salvar alterações' : 'Adicionar'} />
                   </div>
                   <Field value={novaEntrada.nota} onChange={(value) => setNovaEntrada((current) => ({ ...current, nota: value }))} placeholder="Nota (opcional)" />
@@ -2001,12 +2032,12 @@ const FinanceApp = () => {
                 )}
                 <FilterMonth value={mesFiltroEntradas} onChange={setMesFiltroEntradas} />
                 <DataTable
-                  headers={['Categoria', 'Valor', 'Nota', 'Mês', 'Ações']}
-                  rows={entradas.filter((entrada) => entrada.mes === mesFiltroEntradas).map((entrada) => [
+                  headers={['Categoria', 'Valor', 'Nota', 'Data', 'Ações']}
+                  rows={entradas.filter((entrada) => getRecordMonth(entrada) === mesFiltroEntradas).map((entrada) => [
                     entrada.tipo,
                     formatCurrency(entrada.valor),
                     entrada.nota || '-',
-                    entrada.mes,
+                    formatDate(getRecordDate(entrada)),
                     isAdmin ? (
                       <div key={`actions-entrada-${entrada.id}`} className="flex items-center gap-3">
                         <SecondaryTextButton onClick={() => iniciarEdicaoEntrada(entrada)} label="Editar" />
@@ -2032,7 +2063,7 @@ const FinanceApp = () => {
                 <div className="mt-6 grid gap-4 md:grid-cols-4">
                   <Field value={novoLazer.descricao} onChange={(value) => setNovoLazer((current) => ({ ...current, descricao: value }))} placeholder="Descrição" />
                   <Field type="number" value={novoLazer.valor} onChange={(value) => setNovoLazer((current) => ({ ...current, valor: value }))} placeholder="Valor" />
-                  <Field type="month" value={novoLazer.mes} onChange={(value) => setNovoLazer((current) => ({ ...current, mes: value }))} />
+                  <Field type="date" value={novoLazer.data} onChange={(value) => setNovoLazer((current) => ({ ...current, data: value }))} />
                   <PrimaryButton icon={editingLazerId ? Pencil : PlusCircle} onClick={adicionarLazer} disabled={loading} label={editingLazerId ? 'Salvar alterações' : 'Adicionar'} />
                 </div>
                 {editingLazerId && (
@@ -2042,11 +2073,11 @@ const FinanceApp = () => {
                 )}
                 <FilterMonth value={mesFiltroLazer} onChange={setMesFiltroLazer} />
                 <DataTable
-                  headers={['Descrição', 'Valor', 'Mês', 'Ações']}
-                  rows={lazer.filter((item) => item.mes === mesFiltroLazer).map((item) => [
+                  headers={['Descrição', 'Valor', 'Data', 'Ações']}
+                  rows={lazer.filter((item) => getRecordMonth(item) === mesFiltroLazer).map((item) => [
                     item.descricao,
                     formatCurrency(item.valor),
-                    item.mes,
+                    formatDate(getRecordDate(item)),
                     isAdmin ? (
                       <div key={`actions-lazer-${item.id}`} className="flex items-center gap-3">
                         <SecondaryTextButton onClick={() => iniciarEdicaoLazer(item)} label="Editar" />
@@ -2122,7 +2153,7 @@ const FinanceApp = () => {
                       ))}
                     </select>
                     <Field type="number" value={novoInvestimento.valor} onChange={(value) => setNovoInvestimento((current) => ({ ...current, valor: value }))} placeholder="Valor" />
-                    <Field type="month" value={novoInvestimento.mes} onChange={(value) => setNovoInvestimento((current) => ({ ...current, mes: value }))} />
+                    <Field type="date" value={novoInvestimento.data} onChange={(value) => setNovoInvestimento((current) => ({ ...current, data: value }))} />
                     <PrimaryButton icon={editingInvestimentoId ? Pencil : PlusCircle} onClick={adicionarInvestimento} disabled={loading || categoriasInvestimento.length === 0} label={editingInvestimentoId ? 'Salvar alterações' : 'Adicionar'} />
                   </div>
                   <Field value={novoInvestimento.nota} onChange={(value) => setNovoInvestimento((current) => ({ ...current, nota: value }))} placeholder="Descrição (opcional)" />
@@ -2134,12 +2165,12 @@ const FinanceApp = () => {
                 )}
                 <FilterMonth value={mesFiltroInvestimentos} onChange={setMesFiltroInvestimentos} />
                 <DataTable
-                  headers={['Categoria', 'Valor', 'Descrição', 'Mês', 'Ações']}
-                  rows={investimentos.filter((investimento) => investimento.mes === mesFiltroInvestimentos).map((investimento) => [
+                  headers={['Categoria', 'Valor', 'Descrição', 'Data', 'Ações']}
+                  rows={investimentos.filter((investimento) => getRecordMonth(investimento) === mesFiltroInvestimentos).map((investimento) => [
                     investimento.descricao,
                     formatCurrency(investimento.valor),
                     investimento.nota || '-',
-                    investimento.mes,
+                    formatDate(getRecordDate(investimento)),
                     isAdmin ? (
                       <div key={`actions-investimento-${investimento.id}`} className="flex items-center gap-3">
                         <SecondaryTextButton onClick={() => iniciarEdicaoInvestimento(investimento)} label="Editar" />
