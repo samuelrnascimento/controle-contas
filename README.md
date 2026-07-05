@@ -1,4 +1,4 @@
-# finansam
+# SMCustos
 
 Aplicação de controle financeiro doméstico com backend em Node.js, PostgreSQL e frontend React.
 
