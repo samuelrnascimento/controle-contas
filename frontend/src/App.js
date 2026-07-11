@@ -115,7 +115,7 @@ const formatDate = (value) => {
   }
 
   const [year, month, day] = data.split('-');
-  return `${day}/${month}/${year}`;
+  return `${day}-${month}-${year}`;
 };
 const normalizeTenantSlug = (value) => String(value || '')
   .trim()
@@ -392,7 +392,7 @@ const getNextMonth = (monthStr) => {
 };
 
 const monthShortLabels = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
-const monthLongLabels = ['janeiro', 'fevereiro', 'marco', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+const monthLongLabels = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
 
 const parseMonthValue = (monthStr) => {
   const fallbackYear = Number(defaultMonth.slice(0, 4));
@@ -499,7 +499,7 @@ const MonthPicker = ({ value, onChange }) => {
               }}
               className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
             >
-              Ir para mes atual
+              Ir para mês atual
             </button>
           </div>
         </div>
@@ -1920,7 +1920,7 @@ const FinanceApp = () => {
                   <Field value={novaCompra.item} onChange={(value) => setNovaCompra((current) => ({ ...current, item: value }))} placeholder="Item" />
                   <Field type="number" value={novaCompra.quantidade} onChange={(value) => setNovaCompra((current) => ({ ...current, quantidade: value }))} placeholder="Quantidade" />
                   <Field type="number" value={novaCompra.valor} onChange={(value) => setNovaCompra((current) => ({ ...current, valor: value }))} placeholder="Valor" />
-                  <Field type="month" value={novaCompra.mes} onChange={(value) => setNovaCompra((current) => ({ ...current, mes: value }))} />
+                  <MonthPicker value={novaCompra.mes} onChange={(value) => setNovaCompra((current) => ({ ...current, mes: value }))} />
                   <PrimaryButton icon={editingCompraId ? Pencil : PlusCircle} onClick={adicionarCompra} disabled={loading} label={editingCompraId ? 'Salvar alterações' : 'Adicionar'} />
                 </div>
                 {editingCompraId && (
@@ -1935,7 +1935,7 @@ const FinanceApp = () => {
                     compra.item,
                     compra.quantidade,
                     formatCurrency(compra.valor),
-                    compra.mes,
+                    formatMonthLongLabel(compra.mes),
                     isAdmin ? (
                       <div key={`actions-compra-${compra.id}`} className="flex items-center gap-3">
                         <SecondaryTextButton onClick={() => iniciarEdicaoCompra(compra)} label="Editar" />
@@ -2218,9 +2218,7 @@ const FinanceApp = () => {
             {activeTab === 'relatorios' && (
               <div>
                 <SectionHeader title="Relatórios" description="Visão mensal consolidada a partir dos dados do backend." />
-                <div className="mt-6 max-w-xs">
-                  <Field type="month" value={mesRelatorio} onChange={setMesRelatorio} />
-                </div>
+                <FilterMonth value={mesRelatorio} onChange={setMesRelatorio} />
                 <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                   <MetricCard title="Entradas" value={formatCurrency(relatorio.totalEntradas)} tone="bg-emerald-100 text-emerald-900" />
                   <MetricCard title="Compras" value={formatCurrency(relatorio.totalCompras)} tone="bg-blue-100 text-blue-900" />
@@ -2930,7 +2928,7 @@ const FinanceApp = () => {
             <div className="rounded-[28px] bg-slate-950 p-6 text-white shadow-xl shadow-slate-300/40">
               <p className="text-sm uppercase tracking-[0.30em] text-emerald-300">Resumo</p>
               <div className="mt-2 flex items-center justify-between gap-2">
-                <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Mês {mesRelatorio}</p>
+                <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Mês {formatMonthLongLabel(mesRelatorio)}</p>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
