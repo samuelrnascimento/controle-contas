@@ -1673,7 +1673,7 @@ const FinanceApp = () => {
         <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[1.1fr_0.9fr]">
           <section className="rounded-[32px] border border-emerald-400/20 bg-white/5 p-8 shadow-[0_20px_80px_rgba(0,0,0,0.35)] backdrop-blur">
             <h1 className="max-w-xl text-5xl font-black tracking-tight text-white">
-              Finansam com portal do proprietário, usuários e dados centralizados.
+              SMCustos com portal do proprietário, usuários e dados centralizados.
             </h1>
             <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-300">
               A aplicação deixou o modo local em navegador e passou a exigir autenticação real, com um único administrador dono da ferramenta e usuários operacionais separados.
@@ -1699,7 +1699,7 @@ const FinanceApp = () => {
                   value={loginForm.email}
                   onChange={(event) => setLoginForm((current) => ({ ...current, email: event.target.value }))}
                   className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-200"
-                  placeholder="owner@finansam.local"
+                  placeholder="owner@smcustos.local"
                 />
               </label>
               <label className="block">
@@ -1832,7 +1832,7 @@ const FinanceApp = () => {
 
           <div className="relative flex flex-col gap-6 px-8 py-8 lg:flex-row lg:items-start lg:justify-between lg:px-10">
             <div className="flex-1 rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur">
-              <h1 className="mt-3 max-w-3xl text-4xl font-black tracking-tight text-white">FinanSAM</h1>
+              <h1 className="mt-3 max-w-3xl text-4xl font-black tracking-tight text-white">SMCustos</h1>
               <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-300">Controle Financeiro</p>
             </div>
 
@@ -2973,7 +2973,7 @@ const FinanceApp = () => {
             >
               Powered By SMCorp
             </a>
-            <p>Finansam • Plataforma de Controle Financeiro</p>
+            <p>SMCustos • Plataforma de Controle Financeiro</p>
           </div>
         </footer>
       </div>
