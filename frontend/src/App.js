@@ -1673,11 +1673,7 @@ const FinanceApp = () => {
         <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[1.1fr_0.9fr]">
           <section className="rounded-[32px] border border-emerald-400/20 bg-white/5 p-8 shadow-[0_20px_80px_rgba(0,0,0,0.35)] backdrop-blur">
             <h1 className="max-w-xl text-5xl font-black tracking-tight text-white">
-              SMCustos com portal do proprietário, usuários e dados centralizados.
-            </h1>
-            <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-300">
-              A aplicação deixou o modo local em navegador e passou a exigir autenticação real, com um único administrador dono da ferramenta e usuários operacionais separados.
-            </p>
+              SMCustos</h1>
           </section>
 
           <section className="rounded-[32px] bg-[#f8f5ef] p-8 text-slate-900 shadow-[0_24px_90px_rgba(0,0,0,0.22)]">
@@ -1699,7 +1695,7 @@ const FinanceApp = () => {
                   value={loginForm.email}
                   onChange={(event) => setLoginForm((current) => ({ ...current, email: event.target.value }))}
                   className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-200"
-                  placeholder="owner@smcustos.local"
+                  placeholder="seu@email.com.br"
                 />
               </label>
               <label className="block">
@@ -1724,7 +1720,7 @@ const FinanceApp = () => {
             <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3">
               <div>
                 <p className="text-sm font-semibold text-slate-800">Novo por aqui?</p>
-                <p className="text-xs text-slate-500">Crie seu tenant com licença Starter válida por 7 dias.</p>
+                <p className="text-xs text-slate-500">Crie sua conta e teste de forma gratuita por 7 dias.</p>
               </div>
               <button
                 type="button"
