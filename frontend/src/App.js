@@ -40,6 +40,8 @@ const TENANT_STATUSES = [
   { value: 'active', label: 'Ativo' },
   { value: 'inactive', label: 'Inativo' }
 ];
+const LICENSE_EXPIRED_MESSAGE = 'Sua licença expirou. Entre em contato para renovar.';
+const WHATSAPP_SUPPORT_URL = `https://wa.me/5511993931524?text=${encodeURIComponent('Oi minha conta expirou consegue me ajudar')}`;
 
 const defaultMonth = new Date().toISOString().slice(0, 7);
 const defaultDate = new Date().toISOString().slice(0, 10);
@@ -568,6 +570,26 @@ const DataTable = ({ headers, rows, emptyMessage }) => (
     {rows.length === 0 && <p className="px-4 py-8 text-center text-sm text-slate-500">{emptyMessage}</p>}
   </div>
 );
+
+const ErrorMessageText = ({ message }) => {
+  if (String(message || '').toLowerCase().includes('sua licença expirou')) {
+    return (
+      <>
+        {LICENSE_EXPIRED_MESSAGE}{' '}
+        <a
+          href={WHATSAPP_SUPPORT_URL}
+          target="_blank"
+          rel="noreferrer"
+          className="font-semibold underline underline-offset-2 transition hover:text-rose-800"
+        >
+          Abrir WhatsApp
+        </a>
+      </>
+    );
+  }
+
+  return <>{message}</>;
+};
 
 const FinanceApp = () => {
   const tenantViewPreferences = readTenantViewPreferences();
@@ -1811,7 +1833,7 @@ const FinanceApp = () => {
 
             {errorMessage && (
               <div className="mt-4 flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-rose-700">
-                <AlertCircle size={18} className="mt-0.5" /> {errorMessage}
+                <AlertCircle size={18} className="mt-0.5" /> <ErrorMessageText message={errorMessage} />
               </div>
             )}
           </section>
@@ -1871,7 +1893,7 @@ const FinanceApp = () => {
           <div className="mb-6 grid gap-3">
             {errorMessage && (
               <div className="flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-rose-700 shadow-sm">
-                <XCircle size={18} className="mt-0.5" /> {errorMessage}
+                <XCircle size={18} className="mt-0.5" /> <ErrorMessageText message={errorMessage} />
               </div>
             )}
             {successMessage && (
