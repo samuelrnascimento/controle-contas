@@ -583,10 +583,8 @@ const ErrorMessageText = ({ message }) => {
           rel="noreferrer"
           className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-3 py-1 text-sm font-semibold text-white transition hover:bg-emerald-500"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
-            <path d="M22 16.92V21a1 1 0 0 1-1.11 1 19.86 19.86 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.86 19.86 0 0 1 2 3.11 1 1 0 0 1 3 2h4.09a1 1 0 0 1 1 .75c.12.66.38 1.3.77 1.86l-.52.52a1 1 0 0 0-.11 1.4l2.2 2.2a1 1 0 0 0 1.4.11l.52-.52c.56.39 1.2.65 1.86.77a1 1 0 0 1 .75 1V21z" />
-          </svg>
-          WhatsApp
+          <MessageSquare size={16} />
+          <span>WhatsApp</span>
         </a>
       </>
     );
