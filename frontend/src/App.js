@@ -1698,6 +1698,7 @@ const FinanceApp = () => {
           <section className="rounded-[32px] border border-emerald-400/20 bg-white/5 p-8 shadow-[0_20px_80px_rgba(0,0,0,0.35)] backdrop-blur">
             <h1 className="max-w-xl text-5xl font-black tracking-tight text-white">
               SMCustos</h1>
+              <p>Controle sua Vida Financeira</p>
           </section>
 
           <section className="rounded-[32px] bg-[#f8f5ef] p-8 text-slate-900 shadow-[0_24px_90px_rgba(0,0,0,0.22)]">
@@ -1707,7 +1708,6 @@ const FinanceApp = () => {
               </div>
               <div>
                 <h2 className="text-2xl font-bold">Entrar</h2>
-                <p className="text-sm text-slate-600">Use o administrador inicial definido no backend.</p>
               </div>
             </div>
 
