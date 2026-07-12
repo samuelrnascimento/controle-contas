@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle,
+  MessageSquare,
   BarChart3,
   Building2,
   CalendarDays,
@@ -1864,8 +1865,8 @@ const FinanceApp = () => {
                 <p className="text-sm text-slate-300">{user.email}</p>
                 {!isPlatformAdmin && (
                   <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2">
-                    <div className="flex items-center justify-between">
-                      <div>
+                    <div className="flex items-center">
+                      <div className="flex-1">
                         <p className="text-[11px] uppercase tracking-[0.2em] text-slate-400">Licença atual</p>
                         <p className="mt-1 text-sm font-semibold text-emerald-200">{formatTenantPlanLabel(tenantPlan) || 'Starter'}</p>
                         {showLicenseCountdown && (
@@ -1878,7 +1879,7 @@ const FinanceApp = () => {
                       </div>
 
                       <div className="ml-4 flex flex-col items-center justify-center">
-                        <span className="text-[10px] font-semibold text-slate-400 mb-1">Renove Agora</span>
+                        <span className="text-[11px] font-bold text-slate-400 mb-1">Renove Agora</span>
                         <a
                           href={WHATSAPP_SUPPORT_URL}
                           target="_blank"
@@ -1886,9 +1887,7 @@ const FinanceApp = () => {
                           aria-label="Renove agora via WhatsApp"
                           className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-emerald-600 text-white shadow-sm hover:bg-emerald-500 transition"
                         >
-                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-                            <path d="M22 16.92V21a1 1 0 0 1-1.11 1 19.86 19.86 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.86 19.86 0 0 1 2 3.11 1 1 0 0 1 3 2h4.09a1 1 0 0 1 1 .75c.12.66.38 1.3.77 1.86l-.52.52a1 1 0 0 0-.11 1.4l2.2 2.2a1 1 0 0 0 1.4.11l.52-.52c.56.39 1.2.65 1.86.77a1 1 0 0 1 .75 1V21z" />
-                          </svg>
+                          <MessageSquare size={16} />
                         </a>
                       </div>
                     </div>
