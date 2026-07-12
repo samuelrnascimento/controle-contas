@@ -693,7 +693,10 @@ const FinanceApp = () => {
         setUser(null);
       }
 
-      throw new Error(message);
+      const err = new Error(message);
+      // attach HTTP status so callers can decide how to handle it
+      err.status = response.status;
+      throw err;
     }
 
     return data;
@@ -780,7 +783,12 @@ const FinanceApp = () => {
         setActiveTab(session.user.scope === 'platform' ? 'platform' : 'compras');
         await loadProtectedData(session.user, token);
       } catch (error) {
-        setErrorMessage(normalizeError(error));
+        // If session ended / unauthorized, do not show an error message to the user
+        if (error?.status === 401) {
+          setErrorMessage('');
+        } else {
+          setErrorMessage(normalizeError(error));
+        }
       } finally {
         setSessionLoading(false);
       }
