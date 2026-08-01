@@ -52,6 +52,8 @@ CREATE TABLE IF NOT EXISTS entradas (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+ALTER TABLE entradas ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'executed';
+
 -- Tabela de despesas de lazer
 CREATE TABLE IF NOT EXISTS lazer (
     id SERIAL PRIMARY KEY,
@@ -71,6 +73,8 @@ CREATE TABLE IF NOT EXISTS manutencoes (
     data DATE NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+ALTER TABLE manutencoes ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'executed';
 
 -- Tabela de estoque
 CREATE TABLE IF NOT EXISTS estoque (

@@ -335,6 +335,7 @@ const ensureSchema = async () => {
     ALTER TABLE entradas ADD COLUMN IF NOT EXISTS tenant_id TEXT;
     ALTER TABLE entradas ALTER COLUMN tenant_id TYPE TEXT USING tenant_id::text;
     ALTER TABLE entradas ADD COLUMN IF NOT EXISTS nota TEXT;
+    ALTER TABLE entradas ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'executed';
     ALTER TABLE entradas ADD COLUMN IF NOT EXISTS data DATE;
     UPDATE entradas
     SET data = TO_DATE(mes || '-01', 'YYYY-MM-DD')
@@ -363,6 +364,7 @@ const ensureSchema = async () => {
       data DATE NOT NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
+    ALTER TABLE manutencoes ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'executed';
 
     CREATE TABLE IF NOT EXISTS investimentos (
       id SERIAL PRIMARY KEY,
@@ -375,6 +377,7 @@ const ensureSchema = async () => {
     ALTER TABLE investimentos ADD COLUMN IF NOT EXISTS tenant_id TEXT;
     ALTER TABLE investimentos ALTER COLUMN tenant_id TYPE TEXT USING tenant_id::text;
     ALTER TABLE investimentos ADD COLUMN IF NOT EXISTS nota TEXT;
+    ALTER TABLE investimentos ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'executed';
     ALTER TABLE investimentos ADD COLUMN IF NOT EXISTS data DATE;
     UPDATE investimentos
     SET data = TO_DATE(mes || '-01', 'YYYY-MM-DD')
@@ -1364,12 +1367,12 @@ app.post('/api/entradas', authenticateToken, requireTenantScope, async (req, res
   try {
     const result = runtimeCapabilities.hasEntradasTenantId
       ? await pool.query(
-        'INSERT INTO entradas (tenant_id, tipo, valor, mes, data, nota) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-        [req.user.tenant_id, tipo, valorNumerico, mesNormalizado, dataNormalizada, nota || null]
+        'INSERT INTO entradas (tenant_id, tipo, valor, mes, data, nota, status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+        [req.user.tenant_id, tipo, valorNumerico, mesNormalizado, dataNormalizada, nota || null, 'planned']
       )
       : await pool.query(
-        'INSERT INTO entradas (tipo, valor, mes, data, nota) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-        [tipo, valorNumerico, mesNormalizado, dataNormalizada, nota || null]
+        'INSERT INTO entradas (tipo, valor, mes, data, nota, status) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+        [tipo, valorNumerico, mesNormalizado, dataNormalizada, nota || null, 'planned']
       );
 
     res.status(201).json(result.rows[0]);
@@ -1379,10 +1382,26 @@ app.post('/api/entradas', authenticateToken, requireTenantScope, async (req, res
 });
 
 app.patch('/api/entradas/:id', authenticateToken, requireTenantScope, requireRole('admin'), async (req, res) => {
-  const { tipo, valor, mes, data, nota } = req.body;
+  const { tipo, valor, mes, data, nota, status } = req.body;
   const valorNumerico = parseAmount(valor);
   const dataNormalizada = normalizeDateValue(data);
   const mesNormalizado = normalizeMonthValue(mes) || (dataNormalizada ? dataNormalizada.slice(0, 7) : null);
+
+  if (typeof status === 'string' && ['planned', 'executed'].includes(status)) {
+    try {
+      const result = runtimeCapabilities.hasEntradasTenantId
+        ? await pool.query('UPDATE entradas SET status = $1 WHERE id::text = $2 AND tenant_id = $3 RETURNING *', [status, req.params.id, req.user.tenant_id])
+        : await pool.query('UPDATE entradas SET status = $1 WHERE id::text = $2 RETURNING *', [status, req.params.id]);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Entrada não encontrada' });
+      }
+
+      return res.json(result.rows[0]);
+    } catch (error) {
+      return res.status(500).json({ error: error.message });
+    }
+  }
 
   if (!tipo || !mesNormalizado || !dataNormalizada || valorNumerico === null) {
     return res.status(400).json({ error: 'Dados de entrada inválidos' });
@@ -1660,12 +1679,12 @@ app.post('/api/manutencoes', authenticateToken, requireTenantScope, async (req, 
   try {
     const result = runtimeCapabilities.hasManutencoesTenantId
       ? await pool.query(
-        'INSERT INTO manutencoes (tenant_id, descricao, valor, data) VALUES ($1, $2, $3, $4) RETURNING *',
-        [req.user.tenant_id, descricao, valorNumerico, data]
+        'INSERT INTO manutencoes (tenant_id, descricao, valor, data, status) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+        [req.user.tenant_id, descricao, valorNumerico, data, 'planned']
       )
       : await pool.query(
-        'INSERT INTO manutencoes (descricao, valor, data) VALUES ($1, $2, $3) RETURNING *',
-        [descricao, valorNumerico, data]
+        'INSERT INTO manutencoes (descricao, valor, data, status) VALUES ($1, $2, $3, $4) RETURNING *',
+        [descricao, valorNumerico, data, 'planned']
       );
 
     res.status(201).json(result.rows[0]);
@@ -1675,8 +1694,24 @@ app.post('/api/manutencoes', authenticateToken, requireTenantScope, async (req, 
 });
 
 app.patch('/api/manutencoes/:id', authenticateToken, requireTenantScope, requireRole('admin'), async (req, res) => {
-  const { descricao, valor, data } = req.body;
+  const { descricao, valor, data, status } = req.body;
   const valorNumerico = parseAmount(valor);
+
+  if (typeof status === 'string' && ['planned', 'executed'].includes(status)) {
+    try {
+      const result = runtimeCapabilities.hasManutencoesTenantId
+        ? await pool.query('UPDATE manutencoes SET status = $1 WHERE id::text = $2 AND tenant_id = $3 RETURNING *', [status, req.params.id, req.user.tenant_id])
+        : await pool.query('UPDATE manutencoes SET status = $1 WHERE id::text = $2 RETURNING *', [status, req.params.id]);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Despesa extraordinária não encontrada' });
+      }
+
+      return res.json(result.rows[0]);
+    } catch (error) {
+      return res.status(500).json({ error: error.message });
+    }
+  }
 
   if (!descricao || !data || valorNumerico === null) {
     return res.status(400).json({ error: 'Dados de manutenção inválidos' });
@@ -1748,12 +1783,12 @@ app.post('/api/investimentos', authenticateToken, requireTenantScope, async (req
   try {
     const result = runtimeCapabilities.hasInvestimentosTenantId
       ? await pool.query(
-        'INSERT INTO investimentos (tenant_id, descricao, valor, mes, data, nota) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-        [req.user.tenant_id, descricao, valorNumerico, mesNormalizado, dataNormalizada, nota || null]
+        'INSERT INTO investimentos (tenant_id, descricao, valor, mes, data, nota, status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+        [req.user.tenant_id, descricao, valorNumerico, mesNormalizado, dataNormalizada, nota || null, 'planned']
       )
       : await pool.query(
-        'INSERT INTO investimentos (descricao, valor, mes, data, nota) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-        [descricao, valorNumerico, mesNormalizado, dataNormalizada, nota || null]
+        'INSERT INTO investimentos (descricao, valor, mes, data, nota, status) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+        [descricao, valorNumerico, mesNormalizado, dataNormalizada, nota || null, 'planned']
       );
 
     res.status(201).json(result.rows[0]);
@@ -1763,10 +1798,26 @@ app.post('/api/investimentos', authenticateToken, requireTenantScope, async (req
 });
 
 app.patch('/api/investimentos/:id', authenticateToken, requireTenantScope, requireRole('admin'), async (req, res) => {
-  const { descricao, valor, mes, data, nota } = req.body;
+  const { descricao, valor, mes, data, nota, status } = req.body;
   const valorNumerico = parseAmount(valor);
   const dataNormalizada = normalizeDateValue(data);
   const mesNormalizado = normalizeMonthValue(mes) || (dataNormalizada ? dataNormalizada.slice(0, 7) : null);
+
+  if (typeof status === 'string' && ['planned', 'executed'].includes(status)) {
+    try {
+      const result = runtimeCapabilities.hasInvestimentosTenantId
+        ? await pool.query('UPDATE investimentos SET status = $1 WHERE id::text = $2 AND tenant_id = $3 RETURNING *', [status, req.params.id, req.user.tenant_id])
+        : await pool.query('UPDATE investimentos SET status = $1 WHERE id::text = $2 RETURNING *', [status, req.params.id]);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Investimento não encontrado' });
+      }
+
+      return res.json(result.rows[0]);
+    } catch (error) {
+      return res.status(500).json({ error: error.message });
+    }
+  }
 
   if (!descricao || !mesNormalizado || !dataNormalizada || valorNumerico === null) {
     return res.status(400).json({ error: 'Dados de investimento inválidos' });

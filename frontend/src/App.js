@@ -1014,6 +1014,51 @@ const FinanceApp = () => {
     }
   };
 
+  const confirmarEntrada = async (id) => {
+    clearMessages();
+    try {
+      await runMutation(async () => {
+        await apiFetch(`/entradas/${id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ status: 'executed' })
+        });
+      }, 'Entrada marcada como efetivada');
+      await loadProtectedData(user, token);
+    } catch (error) {
+      setErrorMessage(normalizeError(error));
+    }
+  };
+
+  const confirmarInvestimento = async (id) => {
+    clearMessages();
+    try {
+      await runMutation(async () => {
+        await apiFetch(`/investimentos/${id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ status: 'executed' })
+        });
+      }, 'Investimento marcado como efetivado');
+      await loadProtectedData(user, token);
+    } catch (error) {
+      setErrorMessage(normalizeError(error));
+    }
+  };
+
+  const confirmarManutencao = async (id) => {
+    clearMessages();
+    try {
+      await runMutation(async () => {
+        await apiFetch(`/manutencoes/${id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ status: 'executed' })
+        });
+      }, 'Despesa extraordinária marcada como efetivada');
+      await loadProtectedData(user, token);
+    } catch (error) {
+      setErrorMessage(normalizeError(error));
+    }
+  };
+
   const adicionarEntrada = async () => {
     if (!novaEntrada.valor || !novaEntrada.data || !novaEntrada.tipo) {
       setErrorMessage('Preencha todos os campos da entrada');
@@ -1464,13 +1509,19 @@ const FinanceApp = () => {
     const manutencoesMes = manutencoes.filter((manutencao) => manutencao.data.slice(0, 7) === mesRelatorio);
 
     const totalEntradas = entradasMes.reduce((acc, entrada) => acc + Number(entrada.valor), 0);
+    const totalEntradasProjetado = entradasMes.filter((i) => i.status === 'planned').reduce((acc, item) => acc + Number(item.valor), 0);
+    const totalEntradasEfetivado = entradasMes.filter((i) => i.status === 'executed' || !i.status).reduce((acc, item) => acc + Number(item.valor), 0);
     const totalCompras = comprasMes.reduce((acc, compra) => acc + Number(compra.valor), 0);
     const totalContas = contasMes.reduce((acc, conta) => acc + Number(conta.valor), 0);
     const totalLazer = lazerMes.reduce((acc, item) => acc + Number(item.valor), 0);
     const totalLazerProjetado = lazerMes.filter((i) => i.status === 'planned').reduce((acc, item) => acc + Number(item.valor), 0);
     const totalLazerEfetivado = lazerMes.filter((i) => i.status === 'executed' || !i.status).reduce((acc, item) => acc + Number(item.valor), 0);
     const totalInvestimentos = investimentosMes.reduce((acc, investimento) => acc + Number(investimento.valor), 0);
+    const totalInvestimentosProjetado = investimentosMes.filter((i) => i.status === 'planned').reduce((acc, item) => acc + Number(item.valor), 0);
+    const totalInvestimentosEfetivado = investimentosMes.filter((i) => i.status === 'executed' || !i.status).reduce((acc, item) => acc + Number(item.valor), 0);
     const totalManutencoes = manutencoesMes.reduce((acc, manutencao) => acc + Number(manutencao.valor), 0);
+    const totalManutencoesProjetado = manutencoesMes.filter((i) => i.status === 'planned').reduce((acc, item) => acc + Number(item.valor), 0);
+    const totalManutencoesEfetivado = manutencoesMes.filter((i) => i.status === 'executed' || !i.status).reduce((acc, item) => acc + Number(item.valor), 0);
     const totalSaidas = totalCompras + totalContas + totalLazer + totalInvestimentos + totalManutencoes;
     const saldoMes = totalEntradas - totalSaidas;
 
@@ -1486,8 +1537,14 @@ const FinanceApp = () => {
       lazerMes,
       investimentosMes,
       manutencoesMes,
+      totalEntradasProjetado,
+      totalEntradasEfetivado,
       totalLazerProjetado,
       totalLazerEfetivado,
+      totalInvestimentosProjetado,
+      totalInvestimentosEfetivado,
+      totalManutencoesProjetado,
+      totalManutencoesEfetivado,
       contasPorTipo,
       totalEntradas,
       totalCompras,
@@ -2112,16 +2169,20 @@ const FinanceApp = () => {
                 )}
                 <FilterMonth value={mesFiltroEntradas} onChange={setMesFiltroEntradas} />
                 <DataTable
-                  headers={['Categoria', 'Valor', 'Nota', 'Data', 'Ações']}
+                  headers={['Categoria', 'Valor', 'Nota', 'Data', 'Status', 'Ações']}
                   rows={entradas.filter((entrada) => getRecordMonth(entrada) === mesFiltroEntradas).map((entrada) => [
                     entrada.tipo,
                     formatCurrency(entrada.valor),
                     entrada.nota || '-',
                     formatDate(getRecordDate(entrada)),
+                    entrada.status === 'planned' ? 'Projetada' : 'Efetivada',
                     isAdmin ? (
-                      <div key={`actions-entrada-${entrada.id}`} className="flex items-center gap-3">
-                        <SecondaryTextButton onClick={() => iniciarEdicaoEntrada(entrada)} label="Editar" />
-                        <DangerTextButton onClick={() => excluirRegistro(`/entradas/${entrada.id}`, 'Entrada excluída com sucesso')} label="Excluir" />
+                      <div key={`actions-entrada-${entrada.id}`} className="flex items-center gap-2">
+                        {entrada.status === 'planned' && (
+                          <ActionButton icon={CheckCircle2} onClick={() => confirmarEntrada(entrada.id)} label="Confirmar" tone="primary" />
+                        )}
+                        <ActionButton icon={Pencil} onClick={() => iniciarEdicaoEntrada(entrada)} label="Editar" tone="secondary" />
+                        <ActionButton icon={Trash2} onClick={() => excluirRegistro(`/entradas/${entrada.id}`, 'Entrada excluída com sucesso')} label="Excluir" tone="danger" />
                       </div>
                     ) : (
                       <span key={`readonly-entrada-${entrada.id}`} className="text-sm text-slate-400">Somente admin altera/exclui</span>
@@ -2199,15 +2260,19 @@ const FinanceApp = () => {
                 )}
                 <FilterMonth value={mesFiltroManutencoes} onChange={setMesFiltroManutencoes} />
                 <DataTable
-                  headers={['Descrição', 'Valor', 'Data', 'Ações']}
+                  headers={['Descrição', 'Valor', 'Data', 'Status', 'Ações']}
                   rows={manutencoes.filter((manutencao) => manutencao.data.slice(0, 7) === mesFiltroManutencoes).map((manutencao) => [
                     manutencao.descricao,
                     formatCurrency(manutencao.valor),
                     formatDate(manutencao.data),
+                    manutencao.status === 'planned' ? 'Projetada' : 'Efetivada',
                     isAdmin ? (
-                      <div key={`actions-manutencao-${manutencao.id}`} className="flex items-center gap-3">
-                        <SecondaryTextButton onClick={() => iniciarEdicaoManutencao(manutencao)} label="Editar" />
-                        <DangerTextButton onClick={() => excluirRegistro(`/manutencoes/${manutencao.id}`, 'Despesa extraordinária excluída com sucesso')} label="Excluir" />
+                      <div key={`actions-manutencao-${manutencao.id}`} className="flex items-center gap-2">
+                        {manutencao.status === 'planned' && (
+                          <ActionButton icon={CheckCircle2} onClick={() => confirmarManutencao(manutencao.id)} label="Confirmar" tone="primary" />
+                        )}
+                        <ActionButton icon={Pencil} onClick={() => iniciarEdicaoManutencao(manutencao)} label="Editar" tone="secondary" />
+                        <ActionButton icon={Trash2} onClick={() => excluirRegistro(`/manutencoes/${manutencao.id}`, 'Despesa extraordinária excluída com sucesso')} label="Excluir" tone="danger" />
                       </div>
                     ) : (
                       <span key={`readonly-manutencao-${manutencao.id}`} className="text-sm text-slate-400">Somente admin altera/exclui</span>
@@ -2251,16 +2316,20 @@ const FinanceApp = () => {
                 )}
                 <FilterMonth value={mesFiltroInvestimentos} onChange={setMesFiltroInvestimentos} />
                 <DataTable
-                  headers={['Categoria', 'Valor', 'Descrição', 'Data', 'Ações']}
+                  headers={['Categoria', 'Valor', 'Descrição', 'Data', 'Status', 'Ações']}
                   rows={investimentos.filter((investimento) => getRecordMonth(investimento) === mesFiltroInvestimentos).map((investimento) => [
                     investimento.descricao,
                     formatCurrency(investimento.valor),
                     investimento.nota || '-',
                     formatDate(getRecordDate(investimento)),
+                    investimento.status === 'planned' ? 'Projetado' : 'Efetivado',
                     isAdmin ? (
-                      <div key={`actions-investimento-${investimento.id}`} className="flex items-center gap-3">
-                        <SecondaryTextButton onClick={() => iniciarEdicaoInvestimento(investimento)} label="Editar" />
-                        <DangerTextButton onClick={() => excluirRegistro(`/investimentos/${investimento.id}`, 'Investimento excluído com sucesso')} label="Excluir" />
+                      <div key={`actions-investimento-${investimento.id}`} className="flex items-center gap-2">
+                        {investimento.status === 'planned' && (
+                          <ActionButton icon={CheckCircle2} onClick={() => confirmarInvestimento(investimento.id)} label="Confirmar" tone="primary" />
+                        )}
+                        <ActionButton icon={Pencil} onClick={() => iniciarEdicaoInvestimento(investimento)} label="Editar" tone="secondary" />
+                        <ActionButton icon={Trash2} onClick={() => excluirRegistro(`/investimentos/${investimento.id}`, 'Investimento excluído com sucesso')} label="Excluir" tone="danger" />
                       </div>
                     ) : (
                       <span key={`readonly-investimento-${investimento.id}`} className="text-sm text-slate-400">Somente admin altera/exclui</span>
@@ -2307,13 +2376,19 @@ const FinanceApp = () => {
                 <FilterMonth value={mesRelatorio} onChange={setMesRelatorio} />
                 <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                   <MetricCard title="Entradas" value={formatCurrency(relatorio.totalEntradas)} tone="bg-emerald-100 text-emerald-900" />
+                  <MetricCard title="Entradas Projetadas" value={formatCurrency(relatorio.totalEntradasProjetado || 0)} tone="bg-emerald-50 text-emerald-800" />
+                  <MetricCard title="Entradas Efetivadas" value={formatCurrency(relatorio.totalEntradasEfetivado || 0)} tone="bg-emerald-200 text-emerald-900" />
                   <MetricCard title="Compras" value={formatCurrency(relatorio.totalCompras)} tone="bg-blue-100 text-blue-900" />
                   <MetricCard title="Contas" value={formatCurrency(relatorio.totalContas)} tone="bg-cyan-100 text-cyan-900" />
                   <MetricCard title="Lazer" value={formatCurrency(relatorio.totalLazer)} tone="bg-fuchsia-100 text-fuchsia-900" />
                   <MetricCard title="Lazer Projetado" value={formatCurrency(relatorio.totalLazerProjetado || 0)} tone="bg-fuchsia-50 text-fuchsia-800" />
                   <MetricCard title="Lazer Efetivado" value={formatCurrency(relatorio.totalLazerEfetivado || 0)} tone="bg-fuchsia-200 text-fuchsia-900" />
+                  <MetricCard title="Investimentos Projetados" value={formatCurrency(relatorio.totalInvestimentosProjetado || 0)} tone="bg-indigo-50 text-indigo-800" />
+                  <MetricCard title="Investimentos Efetivados" value={formatCurrency(relatorio.totalInvestimentosEfetivado || 0)} tone="bg-indigo-200 text-indigo-900" />
                   <MetricCard title="Investimentos" value={formatCurrency(relatorio.totalInvestimentos)} tone="bg-indigo-100 text-indigo-900" />
                   <MetricCard title="Extraordinárias" value={formatCurrency(relatorio.totalManutencoes)} tone="bg-amber-100 text-amber-900" />
+                  <MetricCard title="Extraordinárias Projetadas" value={formatCurrency(relatorio.totalManutencoesProjetado || 0)} tone="bg-amber-50 text-amber-800" />
+                  <MetricCard title="Extraordinárias Efetivadas" value={formatCurrency(relatorio.totalManutencoesEfetivado || 0)} tone="bg-amber-200 text-amber-900" />
                   <MetricCard title="Total Saídas" value={formatCurrency(relatorio.totalSaidas)} tone="bg-rose-100 text-rose-900" />
                   <MetricCard title="Saldo do Mês" value={formatCurrency(relatorio.saldoMes)} tone={relatorio.saldoMes >= 0 ? 'bg-lime-100 text-lime-900' : 'bg-red-100 text-red-900'} />
                 </div>
