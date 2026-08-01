@@ -366,6 +366,22 @@ const PrimaryButton = ({ icon: Icon, onClick, label, disabled }) => (
   </button>
 );
 
+const ActionButton = ({ icon: Icon, onClick, label, tone = 'primary', disabled }) => {
+  const base = 'inline-flex items-center justify-center gap-2 rounded-xl text-sm font-semibold transition';
+  const tones = {
+    primary: `${base} bg-emerald-600 text-white px-3 py-1 hover:bg-emerald-500`,
+    secondary: `${base} bg-slate-100 text-slate-800 px-3 py-1 hover:bg-slate-200`,
+    danger: `${base} bg-rose-100 text-rose-700 px-3 py-1 hover:bg-rose-200`
+  };
+
+  return (
+    <button type="button" onClick={onClick} disabled={disabled} className={tones[tone]}>
+      {Icon && <Icon size={14} />}
+      <span>{label}</span>
+    </button>
+  );
+};
+
 const DangerTextButton = ({ onClick, label }) => (
   <button type="button" onClick={onClick} className="text-sm font-semibold text-rose-600 transition hover:text-rose-700">
     {label}
@@ -2145,12 +2161,12 @@ const FinanceApp = () => {
                       formatDate(getRecordDate(item)),
                       item.status === 'planned' ? 'Projetada' : 'Efetivada',
                       isAdmin ? (
-                        <div key={`actions-lazer-${item.id}`} className="flex items-center gap-3">
+                        <div key={`actions-lazer-${item.id}`} className="flex items-center gap-2">
                           {item.status === 'planned' && (
-                            <PrimaryButton icon={CheckCircle2} onClick={() => confirmarLazer(item.id)} label="Confirmar" />
+                            <ActionButton icon={CheckCircle2} onClick={() => confirmarLazer(item.id)} label="Confirmar" tone="primary" />
                           )}
-                          <SecondaryTextButton onClick={() => iniciarEdicaoLazer(item)} label="Editar" />
-                          <DangerTextButton onClick={() => excluirRegistro(`/lazer/${item.id}`, 'Despesa de lazer excluída com sucesso')} label="Excluir" />
+                          <ActionButton icon={Pencil} onClick={() => iniciarEdicaoLazer(item)} label="Editar" tone="secondary" />
+                          <ActionButton icon={Trash2} onClick={() => excluirRegistro(`/lazer/${item.id}`, 'Despesa de lazer excluída com sucesso')} label="Excluir" tone="danger" />
                         </div>
                       ) : (
                         <span key={`readonly-lazer-${item.id}`} className="text-sm text-slate-400">Somente admin altera/exclui</span>
