@@ -983,6 +983,21 @@ const FinanceApp = () => {
     }, editingLazerId ? 'Despesa de lazer atualizada com sucesso' : 'Despesa de lazer adicionada com sucesso');
   };
 
+  const confirmarLazer = async (id) => {
+    clearMessages();
+    try {
+      await runMutation(async () => {
+        await apiFetch(`/lazer/${id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ status: 'executed' })
+        });
+      }, 'Despesa marcada como efetivada');
+      await loadProtectedData(user, token);
+    } catch (error) {
+      setErrorMessage(normalizeError(error));
+    }
+  };
+
   const adicionarEntrada = async () => {
     if (!novaEntrada.valor || !novaEntrada.data || !novaEntrada.tipo) {
       setErrorMessage('Preencha todos os campos da entrada');
@@ -1436,6 +1451,8 @@ const FinanceApp = () => {
     const totalCompras = comprasMes.reduce((acc, compra) => acc + Number(compra.valor), 0);
     const totalContas = contasMes.reduce((acc, conta) => acc + Number(conta.valor), 0);
     const totalLazer = lazerMes.reduce((acc, item) => acc + Number(item.valor), 0);
+    const totalLazerProjetado = lazerMes.filter((i) => i.status === 'planned').reduce((acc, item) => acc + Number(item.valor), 0);
+    const totalLazerEfetivado = lazerMes.filter((i) => i.status === 'executed' || !i.status).reduce((acc, item) => acc + Number(item.valor), 0);
     const totalInvestimentos = investimentosMes.reduce((acc, investimento) => acc + Number(investimento.valor), 0);
     const totalManutencoes = manutencoesMes.reduce((acc, manutencao) => acc + Number(manutencao.valor), 0);
     const totalSaidas = totalCompras + totalContas + totalLazer + totalInvestimentos + totalManutencoes;
@@ -1453,6 +1470,8 @@ const FinanceApp = () => {
       lazerMes,
       investimentosMes,
       manutencoesMes,
+      totalLazerProjetado,
+      totalLazerEfetivado,
       contasPorTipo,
       totalEntradas,
       totalCompras,
@@ -2117,23 +2136,50 @@ const FinanceApp = () => {
                   </div>
                 )}
                 <FilterMonth value={mesFiltroLazer} onChange={setMesFiltroLazer} />
-                <DataTable
-                  headers={['Descrição', 'Valor', 'Data', 'Ações']}
-                  rows={lazer.filter((item) => getRecordMonth(item) === mesFiltroLazer).map((item) => [
-                    item.descricao,
-                    formatCurrency(item.valor),
-                    formatDate(getRecordDate(item)),
-                    isAdmin ? (
-                      <div key={`actions-lazer-${item.id}`} className="flex items-center gap-3">
-                        <SecondaryTextButton onClick={() => iniciarEdicaoLazer(item)} label="Editar" />
-                        <DangerTextButton onClick={() => excluirRegistro(`/lazer/${item.id}`, 'Despesa de lazer excluída com sucesso')} label="Excluir" />
-                      </div>
-                    ) : (
-                      <span key={`readonly-lazer-${item.id}`} className="text-sm text-slate-400">Somente admin altera/exclui</span>
-                    )
-                  ])}
-                  emptyMessage="Nenhuma despesa de lazer registrada para este mês"
-                />
+                <div className="mt-6 grid gap-4 md:grid-cols-2">
+                  <div>
+                    <h3 className="mb-3 text-lg font-semibold">Despesas Projetadas</h3>
+                    <DataTable
+                      headers={['Descrição', 'Valor', 'Data', 'Ações']}
+                      rows={lazer.filter((item) => getRecordMonth(item) === mesFiltroLazer && item.status === 'planned').map((item) => [
+                        item.descricao,
+                        formatCurrency(item.valor),
+                        formatDate(getRecordDate(item)),
+                        isAdmin ? (
+                          <div key={`actions-lazer-${item.id}`} className="flex items-center gap-3">
+                            <PrimaryButton icon={CheckCircle2} onClick={() => confirmarLazer(item.id)} label="Confirmar" />
+                            <SecondaryTextButton onClick={() => iniciarEdicaoLazer(item)} label="Editar" />
+                            <DangerTextButton onClick={() => excluirRegistro(`/lazer/${item.id}`, 'Despesa de lazer excluída com sucesso')} label="Excluir" />
+                          </div>
+                        ) : (
+                          <span key={`readonly-lazer-${item.id}`} className="text-sm text-slate-400">Somente admin altera/exclui</span>
+                        )
+                      ])}
+                      emptyMessage="Nenhuma despesa projetada para este mês"
+                    />
+                  </div>
+
+                  <div>
+                    <h3 className="mb-3 text-lg font-semibold">Despesas Efetivadas</h3>
+                    <DataTable
+                      headers={['Descrição', 'Valor', 'Data', 'Ações']}
+                      rows={lazer.filter((item) => getRecordMonth(item) === mesFiltroLazer && (item.status === 'executed' || !item.status)).map((item) => [
+                        item.descricao,
+                        formatCurrency(item.valor),
+                        formatDate(getRecordDate(item)),
+                        isAdmin ? (
+                          <div key={`actions-lazer-${item.id}`} className="flex items-center gap-3">
+                            <SecondaryTextButton onClick={() => iniciarEdicaoLazer(item)} label="Editar" />
+                            <DangerTextButton onClick={() => excluirRegistro(`/lazer/${item.id}`, 'Despesa de lazer excluída com sucesso')} label="Excluir" />
+                          </div>
+                        ) : (
+                          <span key={`readonly-lazer-${item.id}`} className="text-sm text-slate-400">Somente admin altera/exclui</span>
+                        )
+                      ])}
+                      emptyMessage="Nenhuma despesa efetivada para este mês"
+                    />
+                  </div>
+                </div>
               </div>
             )}
 
@@ -2269,6 +2315,8 @@ const FinanceApp = () => {
                   <MetricCard title="Compras" value={formatCurrency(relatorio.totalCompras)} tone="bg-blue-100 text-blue-900" />
                   <MetricCard title="Contas" value={formatCurrency(relatorio.totalContas)} tone="bg-cyan-100 text-cyan-900" />
                   <MetricCard title="Lazer" value={formatCurrency(relatorio.totalLazer)} tone="bg-fuchsia-100 text-fuchsia-900" />
+                  <MetricCard title="Lazer Projetado" value={formatCurrency(relatorio.totalLazerProjetado || 0)} tone="bg-fuchsia-50 text-fuchsia-800" />
+                  <MetricCard title="Lazer Efetivado" value={formatCurrency(relatorio.totalLazerEfetivado || 0)} tone="bg-fuchsia-200 text-fuchsia-900" />
                   <MetricCard title="Investimentos" value={formatCurrency(relatorio.totalInvestimentos)} tone="bg-indigo-100 text-indigo-900" />
                   <MetricCard title="Extraordinárias" value={formatCurrency(relatorio.totalManutencoes)} tone="bg-amber-100 text-amber-900" />
                   <MetricCard title="Total Saídas" value={formatCurrency(relatorio.totalSaidas)} tone="bg-rose-100 text-rose-900" />

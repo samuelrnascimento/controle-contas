@@ -351,6 +351,7 @@ const ensureSchema = async () => {
     ALTER TABLE lazer ADD COLUMN IF NOT EXISTS tenant_id TEXT;
     ALTER TABLE lazer ALTER COLUMN tenant_id TYPE TEXT USING tenant_id::text;
     ALTER TABLE lazer ADD COLUMN IF NOT EXISTS data DATE;
+    ALTER TABLE lazer ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'executed';
     UPDATE lazer
     SET data = TO_DATE(mes || '-01', 'YYYY-MM-DD')
     WHERE data IS NULL AND mes ~ '^\\d{4}-\\d{2}$';
@@ -1543,12 +1544,12 @@ app.post('/api/lazer', authenticateToken, requireTenantScope, async (req, res) =
   try {
     const result = runtimeCapabilities.hasLazerTenantId
       ? await pool.query(
-        'INSERT INTO lazer (tenant_id, descricao, valor, mes, data) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-        [req.user.tenant_id, descricao, valorNumerico, mesNormalizado, dataNormalizada]
+        'INSERT INTO lazer (tenant_id, descricao, valor, mes, data, status) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+        [req.user.tenant_id, descricao, valorNumerico, mesNormalizado, dataNormalizada, 'planned']
       )
       : await pool.query(
-        'INSERT INTO lazer (descricao, valor, mes, data) VALUES ($1, $2, $3, $4) RETURNING *',
-        [descricao, valorNumerico, mesNormalizado, dataNormalizada]
+        'INSERT INTO lazer (descricao, valor, mes, data, status) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+        [descricao, valorNumerico, mesNormalizado, dataNormalizada, 'planned']
       );
 
     res.status(201).json(result.rows[0]);
@@ -1558,11 +1559,35 @@ app.post('/api/lazer', authenticateToken, requireTenantScope, async (req, res) =
 });
 
 app.patch('/api/lazer/:id', authenticateToken, requireTenantScope, requireRole('admin'), async (req, res) => {
-  const { descricao, valor, mes, data } = req.body;
+  const { descricao, valor, mes, data, status } = req.body;
   const valorNumerico = parseAmount(valor);
   const dataNormalizada = normalizeDateValue(data);
   const mesNormalizado = normalizeMonthValue(mes) || (dataNormalizada ? dataNormalizada.slice(0, 7) : null);
 
+  // If only status is being updated, accept it directly
+  if (typeof status === 'string' && ['planned', 'executed'].includes(status)) {
+    try {
+      const result = runtimeCapabilities.hasLazerTenantId
+        ? await pool.query(
+          `UPDATE lazer SET status = $1 WHERE id::text = $2 AND tenant_id = $3 RETURNING *`,
+          [status, req.params.id, req.user.tenant_id]
+        )
+        : await pool.query(
+          `UPDATE lazer SET status = $1 WHERE id::text = $2 RETURNING *`,
+          [status, req.params.id]
+        );
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Despesa de lazer não encontrada' });
+      }
+
+      return res.json(result.rows[0]);
+    } catch (error) {
+      return res.status(500).json({ error: error.message });
+    }
+  }
+
+  // Otherwise validate full update payload
   if (!descricao || !mesNormalizado || !dataNormalizada || valorNumerico === null) {
     return res.status(400).json({ error: 'Dados de despesa de lazer inválidos' });
   }
@@ -1571,17 +1596,21 @@ app.patch('/api/lazer/:id', authenticateToken, requireTenantScope, requireRole('
     const result = runtimeCapabilities.hasLazerTenantId
       ? await pool.query(
         `UPDATE lazer
-         SET descricao = $1, valor = $2, mes = $3, data = $4
-         WHERE id::text = $5 AND tenant_id = $6
+         SET descricao = $1, valor = $2, mes = $3, data = $4${typeof status === 'string' && ['planned','executed'].includes(status) ? ', status = $6' : ''}
+         WHERE id::text = $5 AND tenant_id = $7
          RETURNING *`,
-        [descricao, valorNumerico, mesNormalizado, dataNormalizada, req.params.id, req.user.tenant_id]
+        typeof status === 'string' && ['planned','executed'].includes(status)
+          ? [descricao, valorNumerico, mesNormalizado, dataNormalizada, req.params.id, status, req.user.tenant_id]
+          : [descricao, valorNumerico, mesNormalizado, dataNormalizada, req.params.id, req.user.tenant_id]
       )
       : await pool.query(
         `UPDATE lazer
-         SET descricao = $1, valor = $2, mes = $3, data = $4
+         SET descricao = $1, valor = $2, mes = $3, data = $4${typeof status === 'string' && ['planned','executed'].includes(status) ? ', status = $6' : ''}
          WHERE id::text = $5
          RETURNING *`,
-        [descricao, valorNumerico, mesNormalizado, dataNormalizada, req.params.id]
+        typeof status === 'string' && ['planned','executed'].includes(status)
+          ? [descricao, valorNumerico, mesNormalizado, dataNormalizada, req.params.id, status]
+          : [descricao, valorNumerico, mesNormalizado, dataNormalizada, req.params.id]
       );
 
     if (result.rows.length === 0) {
