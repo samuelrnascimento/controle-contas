@@ -1513,6 +1513,8 @@ const FinanceApp = () => {
     const totalEntradasEfetivado = entradasMes.filter((i) => i.status === 'executed' || !i.status).reduce((acc, item) => acc + Number(item.valor), 0);
     const totalCompras = comprasMes.reduce((acc, compra) => acc + Number(compra.valor), 0);
     const totalContas = contasMes.reduce((acc, conta) => acc + Number(conta.valor), 0);
+    const totalContasProjetado = contasMes.filter((i) => i.status === 'planned').reduce((acc, item) => acc + Number(item.valor), 0);
+    const totalContasEfetivado = contasMes.filter((i) => i.status === 'executed' || !i.status).reduce((acc, item) => acc + Number(item.valor), 0);
     const totalLazer = lazerMes.reduce((acc, item) => acc + Number(item.valor), 0);
     const totalLazerProjetado = lazerMes.filter((i) => i.status === 'planned').reduce((acc, item) => acc + Number(item.valor), 0);
     const totalLazerEfetivado = lazerMes.filter((i) => i.status === 'executed' || !i.status).reduce((acc, item) => acc + Number(item.valor), 0);
@@ -1545,6 +1547,8 @@ const FinanceApp = () => {
       totalInvestimentosEfetivado,
       totalManutencoesProjetado,
       totalManutencoesEfetivado,
+      totalContasProjetado,
+      totalContasEfetivado,
       contasPorTipo,
       totalEntradas,
       totalCompras,
@@ -2374,23 +2378,35 @@ const FinanceApp = () => {
               <div>
                 <SectionHeader title="Relatórios" description="Visão mensal consolidada a partir dos dados do backend." />
                 <FilterMonth value={mesRelatorio} onChange={setMesRelatorio} />
-                <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                  <MetricCard title="Entradas" value={formatCurrency(relatorio.totalEntradas)} tone="bg-emerald-100 text-emerald-900" />
-                  <MetricCard title="Entradas Projetadas" value={formatCurrency(relatorio.totalEntradasProjetado || 0)} tone="bg-emerald-50 text-emerald-800" />
-                  <MetricCard title="Entradas Efetivadas" value={formatCurrency(relatorio.totalEntradasEfetivado || 0)} tone="bg-emerald-200 text-emerald-900" />
-                  <MetricCard title="Compras" value={formatCurrency(relatorio.totalCompras)} tone="bg-blue-100 text-blue-900" />
-                  <MetricCard title="Contas" value={formatCurrency(relatorio.totalContas)} tone="bg-cyan-100 text-cyan-900" />
-                  <MetricCard title="Lazer" value={formatCurrency(relatorio.totalLazer)} tone="bg-fuchsia-100 text-fuchsia-900" />
-                  <MetricCard title="Lazer Projetado" value={formatCurrency(relatorio.totalLazerProjetado || 0)} tone="bg-fuchsia-50 text-fuchsia-800" />
-                  <MetricCard title="Lazer Efetivado" value={formatCurrency(relatorio.totalLazerEfetivado || 0)} tone="bg-fuchsia-200 text-fuchsia-900" />
-                  <MetricCard title="Investimentos Projetados" value={formatCurrency(relatorio.totalInvestimentosProjetado || 0)} tone="bg-indigo-50 text-indigo-800" />
-                  <MetricCard title="Investimentos Efetivados" value={formatCurrency(relatorio.totalInvestimentosEfetivado || 0)} tone="bg-indigo-200 text-indigo-900" />
-                  <MetricCard title="Investimentos" value={formatCurrency(relatorio.totalInvestimentos)} tone="bg-indigo-100 text-indigo-900" />
-                  <MetricCard title="Extraordinárias" value={formatCurrency(relatorio.totalManutencoes)} tone="bg-amber-100 text-amber-900" />
-                  <MetricCard title="Extraordinárias Projetadas" value={formatCurrency(relatorio.totalManutencoesProjetado || 0)} tone="bg-amber-50 text-amber-800" />
-                  <MetricCard title="Extraordinárias Efetivadas" value={formatCurrency(relatorio.totalManutencoesEfetivado || 0)} tone="bg-amber-200 text-amber-900" />
-                  <MetricCard title="Total Saídas" value={formatCurrency(relatorio.totalSaidas)} tone="bg-rose-100 text-rose-900" />
-                  <MetricCard title="Saldo do Mês" value={formatCurrency(relatorio.saldoMes)} tone={relatorio.saldoMes >= 0 ? 'bg-lime-100 text-lime-900' : 'bg-red-100 text-red-900'} />
+                <div className="mt-6 space-y-4">
+                  {[
+                    { label: 'Entradas', projetado: relatorio.totalEntradasProjetado || 0, efetivado: relatorio.totalEntradasEfetivado || 0 },
+                    { label: 'Contas', projetado: relatorio.totalContasProjetado || 0, efetivado: relatorio.totalContasEfetivado || 0 },
+                    { label: 'Lazer', projetado: relatorio.totalLazerProjetado || 0, efetivado: relatorio.totalLazerEfetivado || 0 },
+                    { label: 'Investimentos', projetado: relatorio.totalInvestimentosProjetado || 0, efetivado: relatorio.totalInvestimentosEfetivado || 0 },
+                    { label: 'Extraordinárias', projetado: relatorio.totalManutencoesProjetado || 0, efetivado: relatorio.totalManutencoesEfetivado || 0 }
+                  ].map((cat) => {
+                    const diferenca = cat.projetado - cat.efetivado;
+
+                    return (
+                      <div key={cat.label} className="flex items-center gap-4 rounded-[28px] border border-slate-200/80 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5 shadow-[0_12px_35px_rgba(15,23,42,0.05)]">
+                        <div className="flex-1">
+                          <div className="text-sm font-semibold text-slate-600">{cat.label} Projetado</div>
+                          <div className="mt-2 text-2xl font-bold text-slate-900">{formatCurrency(cat.projetado)}</div>
+                        </div>
+
+                        <div className="flex-1 text-center">
+                          <div className="text-sm font-semibold text-slate-600">Efetivado</div>
+                          <div className="mt-2 text-2xl font-bold text-slate-900">{formatCurrency(cat.efetivado)}</div>
+                        </div>
+
+                        <div className="flex-1 text-right">
+                          <div className="text-sm font-semibold text-slate-600">Diferença</div>
+                          <div className={`mt-2 text-2xl font-bold ${diferenca >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{formatCurrency(diferenca)}</div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
 
                 <div className="mt-8 grid gap-6 xl:grid-cols-2">
