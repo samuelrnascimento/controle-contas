@@ -2136,49 +2136,28 @@ const FinanceApp = () => {
                   </div>
                 )}
                 <FilterMonth value={mesFiltroLazer} onChange={setMesFiltroLazer} />
-                <div className="mt-6 grid gap-4 md:grid-cols-2">
-                  <div>
-                    <h3 className="mb-3 text-lg font-semibold">Despesas Projetadas</h3>
-                    <DataTable
-                      headers={['Descrição', 'Valor', 'Data', 'Ações']}
-                      rows={lazer.filter((item) => getRecordMonth(item) === mesFiltroLazer && item.status === 'planned').map((item) => [
-                        item.descricao,
-                        formatCurrency(item.valor),
-                        formatDate(getRecordDate(item)),
-                        isAdmin ? (
-                          <div key={`actions-lazer-${item.id}`} className="flex items-center gap-3">
+                <div className="mt-6">
+                  <DataTable
+                    headers={['Descrição', 'Valor', 'Data', 'Status', 'Ações']}
+                    rows={lazer.filter((item) => getRecordMonth(item) === mesFiltroLazer).map((item) => [
+                      item.descricao,
+                      formatCurrency(item.valor),
+                      formatDate(getRecordDate(item)),
+                      item.status === 'planned' ? 'Projetada' : 'Efetivada',
+                      isAdmin ? (
+                        <div key={`actions-lazer-${item.id}`} className="flex items-center gap-3">
+                          {item.status === 'planned' && (
                             <PrimaryButton icon={CheckCircle2} onClick={() => confirmarLazer(item.id)} label="Confirmar" />
-                            <SecondaryTextButton onClick={() => iniciarEdicaoLazer(item)} label="Editar" />
-                            <DangerTextButton onClick={() => excluirRegistro(`/lazer/${item.id}`, 'Despesa de lazer excluída com sucesso')} label="Excluir" />
-                          </div>
-                        ) : (
-                          <span key={`readonly-lazer-${item.id}`} className="text-sm text-slate-400">Somente admin altera/exclui</span>
-                        )
-                      ])}
-                      emptyMessage="Nenhuma despesa projetada para este mês"
-                    />
-                  </div>
-
-                  <div>
-                    <h3 className="mb-3 text-lg font-semibold">Despesas Efetivadas</h3>
-                    <DataTable
-                      headers={['Descrição', 'Valor', 'Data', 'Ações']}
-                      rows={lazer.filter((item) => getRecordMonth(item) === mesFiltroLazer && (item.status === 'executed' || !item.status)).map((item) => [
-                        item.descricao,
-                        formatCurrency(item.valor),
-                        formatDate(getRecordDate(item)),
-                        isAdmin ? (
-                          <div key={`actions-lazer-${item.id}`} className="flex items-center gap-3">
-                            <SecondaryTextButton onClick={() => iniciarEdicaoLazer(item)} label="Editar" />
-                            <DangerTextButton onClick={() => excluirRegistro(`/lazer/${item.id}`, 'Despesa de lazer excluída com sucesso')} label="Excluir" />
-                          </div>
-                        ) : (
-                          <span key={`readonly-lazer-${item.id}`} className="text-sm text-slate-400">Somente admin altera/exclui</span>
-                        )
-                      ])}
-                      emptyMessage="Nenhuma despesa efetivada para este mês"
-                    />
-                  </div>
+                          )}
+                          <SecondaryTextButton onClick={() => iniciarEdicaoLazer(item)} label="Editar" />
+                          <DangerTextButton onClick={() => excluirRegistro(`/lazer/${item.id}`, 'Despesa de lazer excluída com sucesso')} label="Excluir" />
+                        </div>
+                      ) : (
+                        <span key={`readonly-lazer-${item.id}`} className="text-sm text-slate-400">Somente admin altera/exclui</span>
+                      )
+                    ])}
+                    emptyMessage="Nenhuma despesa registrada para este mês"
+                  />
                 </div>
               </div>
             )}
