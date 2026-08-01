@@ -1059,6 +1059,21 @@ const FinanceApp = () => {
     }
   };
 
+  const confirmarConta = async (id) => {
+    clearMessages();
+    try {
+      await runMutation(async () => {
+        await apiFetch(`/contas/${id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ status: 'executed' })
+        });
+      }, 'Conta marcada como efetivada');
+      await loadProtectedData(user, token);
+    } catch (error) {
+      setErrorMessage(normalizeError(error));
+    }
+  };
+
   const adicionarEntrada = async () => {
     if (!novaEntrada.valor || !novaEntrada.data || !novaEntrada.tipo) {
       setErrorMessage('Preencha todos os campos da entrada');
@@ -2121,15 +2136,19 @@ const FinanceApp = () => {
                 )}
                 <FilterMonth value={mesFiltroContas} onChange={setMesFiltroContas} />
                 <DataTable
-                  headers={['Tipo', 'Valor', 'Data', 'Ações']}
+                  headers={['Tipo', 'Valor', 'Data', 'Status', 'Ações']}
                   rows={contas.filter((conta) => getRecordMonth(conta) === mesFiltroContas).map((conta) => [
                     conta.tipo,
                     formatCurrency(conta.valor),
                     formatDate(getRecordDate(conta)),
+                    conta.status === 'planned' ? 'Projetado' : 'Efetivado',
                     isAdmin ? (
-                      <div key={`actions-conta-${conta.id}`} className="flex items-center gap-3">
-                        <SecondaryTextButton onClick={() => iniciarEdicaoConta(conta)} label="Editar" />
-                        <DangerTextButton onClick={() => excluirRegistro(`/contas/${conta.id}`, 'Conta excluída com sucesso')} label="Excluir" />
+                      <div key={`actions-conta-${conta.id}`} className="flex items-center gap-2">
+                        {conta.status === 'planned' && (
+                          <ActionButton icon={CheckCircle2} onClick={() => confirmarConta(conta.id)} label="Confirmar" tone="primary" />
+                        )}
+                        <ActionButton icon={Pencil} onClick={() => iniciarEdicaoConta(conta)} label="Editar" tone="secondary" />
+                        <ActionButton icon={Trash2} onClick={() => excluirRegistro(`/contas/${conta.id}`, 'Conta excluída com sucesso')} label="Excluir" tone="danger" />
                       </div>
                     ) : (
                       <span key={`readonly-conta-${conta.id}`} className="text-sm text-slate-400">Somente admin altera/exclui</span>
@@ -2376,7 +2395,7 @@ const FinanceApp = () => {
 
             {activeTab === 'relatorios' && (
               <div>
-                <SectionHeader title="Relatórios" description="Visão mensal consolidada a partir dos dados do backend." />
+                <SectionHeader title="Relatórios" description="Visão mensal consolidada." />
                 <FilterMonth value={mesRelatorio} onChange={setMesRelatorio} />
                 <div className="mt-6 space-y-4">
                   {[
@@ -2458,7 +2477,7 @@ const FinanceApp = () => {
 
             {activeTab === 'admin' && isAdmin && (
               <div>
-                <SectionHeader title="Portal Administrativo" description="Gestão do proprietário: acessos, senhas e diagnóstico da migração para backend centralizado." />
+                <SectionHeader title="Portal Administrativo"/>
 
                 <div className="mt-6 grid gap-6">
                   <div className="rounded-[28px] border border-slate-200/80 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5 shadow-[0_12px_35px_rgba(15,23,42,0.05)]">

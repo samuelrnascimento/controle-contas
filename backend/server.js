@@ -1488,7 +1488,42 @@ app.post('/api/contas', authenticateToken, requireTenantScope, async (req, res) 
 });
 
 app.patch('/api/contas/:id', authenticateToken, requireTenantScope, requireRole('admin'), async (req, res) => {
-  const { tipo, valor, mes, data } = req.body;
+  const { tipo, valor, mes, data, status } = req.body;
+
+  // If caller is only updating status, allow status-only PATCH
+  if (typeof status !== 'undefined') {
+    if (!['planned', 'executed'].includes(status)) {
+      return res.status(400).json({ error: 'Status inválido' });
+    }
+
+    try {
+      const result = runtimeCapabilities.hasContasTenantId
+        ? await pool.query(
+          `UPDATE contas
+           SET status = $1
+           WHERE id::text = $2 AND tenant_id = $3
+           RETURNING *`,
+          [status, req.params.id, req.user.tenant_id]
+        )
+        : await pool.query(
+          `UPDATE contas
+           SET status = $1
+           WHERE id::text = $2
+           RETURNING *`,
+          [status, req.params.id]
+        );
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Conta não encontrada' });
+      }
+
+      return res.json(result.rows[0]);
+    } catch (error) {
+      return res.status(500).json({ error: error.message });
+    }
+  }
+
+  // Otherwise fall back to full update behavior
   const valorNumerico = parseAmount(valor);
   const dataNormalizada = normalizeDateValue(data);
   const mesNormalizado = normalizeMonthValue(mes) || (dataNormalizada ? dataNormalizada.slice(0, 7) : null);
