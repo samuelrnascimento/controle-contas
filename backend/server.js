@@ -543,6 +543,29 @@ const discoverCapabilities = async () => {
     && investimentosTenantResult.rows[0]?.has_investimentos_tenant_id === true;
   runtimeCapabilities.hasCategoriasTenantId = runtimeCapabilities.hasUsersTenantId
     && categoriasTenantResult.rows[0]?.has_categorias_tenant_id === true;
+
+  // Detect optional tenant columns for expiration dates
+  if (runtimeCapabilities.hasTenantsTable) {
+    const trialExpiresCol = await pool.query(
+      `SELECT EXISTS (
+         SELECT 1 FROM information_schema.columns
+         WHERE table_schema = 'public' AND table_name = 'tenants' AND column_name = 'trial_expires_at'
+       ) AS has_trial_expires`
+    );
+
+    const subscriptionExpiresCol = await pool.query(
+      `SELECT EXISTS (
+         SELECT 1 FROM information_schema.columns
+         WHERE table_schema = 'public' AND table_name = 'tenants' AND column_name = 'subscription_expires_at'
+       ) AS has_subscription_expires`
+    );
+
+    runtimeCapabilities.hasTenantTrialExpiresAt = trialExpiresCol.rows[0]?.has_trial_expires === true;
+    runtimeCapabilities.hasTenantSubscriptionExpiresAt = subscriptionExpiresCol.rows[0]?.has_subscription_expires === true;
+  } else {
+    runtimeCapabilities.hasTenantTrialExpiresAt = false;
+    runtimeCapabilities.hasTenantSubscriptionExpiresAt = false;
+  }
 };
 
 const hasPasswordChanged = async (plainPassword, passwordHash) => {
@@ -1969,13 +1992,18 @@ app.get('/api/platform/tenants', authenticateToken, requirePlatformAdmin, async 
       ? `COALESCE((SELECT COUNT(*)::int FROM users u WHERE u.tenant_id = t.id), 0) AS users_count`
       : '0::int AS users_count';
 
-    const result = await pool.query(
-      `SELECT t.id, t.name, t.slug, t.plan, t.subscription_status, t.trial_expires_at, t.subscription_expires_at, t.created_at, ${usersCountSql},
-              (t.slug = $1) AS is_protected
-       FROM tenants t
-       ORDER BY t.created_at DESC, t.name ASC`,
-      [adminTenantSlug]
-    );
+    // Build select columns conditionally depending on available tenant columns
+    const extraCols = [];
+    if (runtimeCapabilities.hasTenantTrialExpiresAt) extraCols.push('t.trial_expires_at');
+    if (runtimeCapabilities.hasTenantSubscriptionExpiresAt) extraCols.push('t.subscription_expires_at');
+    const extraSelect = extraCols.length > 0 ? `${extraCols.join(', ')}, ` : '';
+
+    const sql = `SELECT t.id, t.name, t.slug, t.plan, t.subscription_status, ${extraSelect}t.created_at, ${usersCountSql},
+                  (t.slug = $1) AS is_protected
+           FROM tenants t
+           ORDER BY t.created_at DESC, t.name ASC`;
+
+    const result = await pool.query(sql, [adminTenantSlug]);
 
     res.json(result.rows);
   } catch (error) {
