@@ -1970,7 +1970,7 @@ app.get('/api/platform/tenants', authenticateToken, requirePlatformAdmin, async 
       : '0::int AS users_count';
 
     const result = await pool.query(
-      `SELECT t.id, t.name, t.slug, t.plan, t.subscription_status, t.created_at, ${usersCountSql},
+      `SELECT t.id, t.name, t.slug, t.plan, t.subscription_status, t.trial_expires_at, t.subscription_expires_at, t.created_at, ${usersCountSql},
               (t.slug = $1) AS is_protected
        FROM tenants t
        ORDER BY t.created_at DESC, t.name ASC`,

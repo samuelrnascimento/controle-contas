@@ -1590,14 +1590,26 @@ const FinanceApp = () => {
     const manutencoesMes = manutencoes.filter((manutencao) => manutencao.data.slice(0, 7) === mesRelatorio);
     const estoqueMes = estoque.filter((item) => String(item.updated_at || '').slice(0, 7) === mesRelatorio);
 
+    const tenantsExpiring = (platformTenants || []).filter((t) => {
+      const dateStr = t.trial_expires_at || t.subscription_expires_at || t.expires_at || t.trialExpiresAt || t.subscription_expires || null;
+      if (!dateStr) return false;
+      // normalize to YYYY-MM
+      const month = String(dateStr).slice(0, 7);
+      return month === mesRelatorio;
+    }).length;
+
+    const tenantsInactive = (platformTenants || []).filter((t) => normalizeTenantStatus(t.subscription_status || t.status || t.subscriptionStatus) === 'inactive').length;
+
     return {
       contas: contasMes.length,
       entradas: entradasMes.length,
       investimentos: investimentosMes.length,
       manutencoes: manutencoesMes.length,
-      estoque: estoqueMes.length
+      estoque: estoqueMes.length,
+      tenantsExpiring,
+      tenantsInactive
     };
-  }, [contas, entradas, investimentos, manutencoes, estoque, mesRelatorio]);
+  }, [contas, entradas, investimentos, manutencoes, estoque, mesRelatorio, platformTenants]);
 
   const tenantPlanOptions = useMemo(() => {
     const options = Array.from(new Set(
@@ -3181,6 +3193,8 @@ const FinanceApp = () => {
                 {!isPlatformAdmin && <SummaryRow label="Investimentos" value={String(resumoMensal.investimentos)} />}
                 {!isPlatformAdmin && <SummaryRow label="Extraordinárias" value={String(resumoMensal.manutencoes)} />}
                 {!isPlatformAdmin && <SummaryRow label="Itens em estoque" value={String(resumoMensal.estoque)} />}
+                  {isPlatformAdmin && <SummaryRow label="Tenants expirando" value={String(resumoMensal.tenantsExpiring || 0)} />}
+                  {isPlatformAdmin && <SummaryRow label="Tenants inativos" value={String(resumoMensal.tenantsInactive || 0)} />}
                 {isAdmin && <SummaryRow label="Usuários ativos" value={String(usuarios.filter((registeredUser) => registeredUser.active).length)} />}
                 {isPlatformAdmin && <SummaryRow label="Tenants" value={String(platformTenants.length)} />}
                 {isPlatformAdmin && <SummaryRow label="Usuários globais" value={String(platformUsers.length)} />}
