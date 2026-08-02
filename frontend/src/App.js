@@ -2794,13 +2794,6 @@ const FinanceApp = () => {
                   <div className="mt-6 rounded-[28px] border border-slate-200/80 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5 shadow-[0_12px_35px_rgba(15,23,42,0.05)]">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <h3 className="text-lg font-bold">Editar tenant</h3>
-                      <button
-                        type="button"
-                        onClick={cancelarEdicaoTenant}
-                        className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
-                      >
-                        Cancelar edição
-                      </button>
                     </div>
                     <div className="mt-4 grid gap-3 md:grid-cols-4">
                       <Field value={editTenantForm.firstName} onChange={(value) => setEditTenantForm((current) => ({ ...current, firstName: value }))} placeholder="Nome *" />
@@ -2865,13 +2858,20 @@ const FinanceApp = () => {
                       )}
                     </div>
                     <p className="mt-3 text-xs text-slate-500">Campos com * são obrigatórios. Sobrenome e Empresa são opcionais.</p>
-                    <div className="mt-4">
+                    <div className="mt-4 flex items-center gap-3">
                       <PrimaryButton
                         icon={PlusCircle}
                         onClick={salvarTenant}
                         disabled={loading}
                         label="Salvar alterações"
                       />
+                      <button
+                        type="button"
+                        onClick={cancelarEdicaoTenant}
+                        className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                      >
+                        Cancelar edição
+                      </button>
                     </div>
                   </div>
                 )}
