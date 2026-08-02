@@ -1547,6 +1547,12 @@ const FinanceApp = () => {
       return acc;
     }, {});
 
+    const investimentosPorTipo = investimentosMes.reduce((acc, investimento) => {
+      const key = investimento.descricao || investimento.tipo || 'Outros';
+      acc[key] = (acc[key] || 0) + Number(investimento.valor);
+      return acc;
+    }, {});
+
     return {
       comprasMes,
       contasMes,
@@ -1565,6 +1571,7 @@ const FinanceApp = () => {
       totalContasProjetado,
       totalContasEfetivado,
       contasPorTipo,
+      investimentosPorTipo,
       totalEntradas,
       totalCompras,
       totalContas,
@@ -2429,25 +2436,49 @@ const FinanceApp = () => {
                 </div>
 
                 <div className="mt-8 grid gap-6 xl:grid-cols-2">
-                  <div className="rounded-[28px] border border-slate-200/80 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5 shadow-[0_12px_35px_rgba(15,23,42,0.05)]">
-                    <h3 className="text-lg font-bold">Gastos por tipo de conta</h3>
-                    <div className="mt-4 space-y-3">
-                      {Object.keys(relatorio.contasPorTipo).length === 0 && <p className="text-sm text-slate-500">Sem contas no mês selecionado.</p>}
-                      {Object.entries(relatorio.contasPorTipo).map(([tipo, valor]) => {
-                        const width = relatorio.totalContas > 0 ? valueToPercent(valor, relatorio.totalContas) : 0;
+                  <div>
+                    <div className="rounded-[28px] border border-slate-200/80 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5 shadow-[0_12px_35px_rgba(15,23,42,0.05)] mb-4">
+                      <h3 className="text-lg font-bold">Gastos por tipo de conta</h3>
+                      <div className="mt-4 space-y-3">
+                        {Object.keys(relatorio.contasPorTipo).length === 0 && <p className="text-sm text-slate-500">Sem contas no mês selecionado.</p>}
+                        {Object.entries(relatorio.contasPorTipo).map(([tipo, valor]) => {
+                          const width = relatorio.totalContas > 0 ? valueToPercent(valor, relatorio.totalContas) : 0;
 
-                        return (
-                          <div key={tipo}>
-                            <div className="mb-1 flex items-center justify-between text-sm font-semibold text-slate-700">
-                              <span>{tipo}</span>
-                              <span>{formatCurrency(valor)}</span>
+                          return (
+                            <div key={tipo}>
+                              <div className="mb-1 flex items-center justify-between text-sm font-semibold text-slate-700">
+                                <span>{tipo}</span>
+                                <span>{formatCurrency(valor)}</span>
+                              </div>
+                              <div className="h-3 overflow-hidden rounded-full bg-slate-200">
+                                <div className="h-full rounded-full bg-slate-900" style={{ width: `${width}%` }} />
+                              </div>
                             </div>
-                            <div className="h-3 overflow-hidden rounded-full bg-slate-200">
-                              <div className="h-full rounded-full bg-slate-900" style={{ width: `${width}%` }} />
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="rounded-[28px] border border-slate-200/80 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5 shadow-[0_12px_35px_rgba(15,23,42,0.05)]">
+                      <h3 className="text-lg font-bold">Investimentos por tipo</h3>
+                      <div className="mt-4 space-y-3">
+                        {Object.keys(relatorio.investimentosPorTipo).length === 0 && <p className="text-sm text-slate-500">Sem investimentos no mês selecionado.</p>}
+                        {Object.entries(relatorio.investimentosPorTipo).map(([tipo, valor]) => {
+                          const width = relatorio.totalInvestimentos > 0 ? valueToPercent(valor, relatorio.totalInvestimentos) : 0;
+
+                          return (
+                            <div key={tipo}>
+                              <div className="mb-1 flex items-center justify-between text-sm font-semibold text-slate-700">
+                                <span>{tipo}</span>
+                                <span>{formatCurrency(valor)}</span>
+                              </div>
+                              <div className="h-3 overflow-hidden rounded-full bg-slate-200">
+                                <div className="h-full rounded-full bg-indigo-600" style={{ width: `${width}%` }} />
+                              </div>
                             </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
 

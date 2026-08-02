@@ -2088,6 +2088,52 @@ app.post('/api/platform/tenants', authenticateToken, requirePlatformAdmin, async
   }
 });
 
+// Platform: list compras for a specific tenant (platform admin)
+app.get('/api/platform/tenants/:id/compras', authenticateToken, requirePlatformAdmin, async (req, res) => {
+  if (!runtimeCapabilities.hasTenantsTable) {
+    return res.status(400).json({ error: 'Tabela tenants não está disponível neste ambiente' });
+  }
+
+  const targetId = String(req.params.id || '').trim();
+
+  if (!targetId) {
+    return res.status(400).json({ error: 'Identificador de tenant inválido' });
+  }
+
+  try {
+    const result = runtimeCapabilities.hasComprasTenantId
+      ? await pool.query('SELECT * FROM compras WHERE tenant_id::text = $1 ORDER BY mes DESC, id DESC', [targetId])
+      : await pool.query('SELECT * FROM compras ORDER BY mes DESC, id DESC');
+
+    return res.json(result.rows);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// Platform: list contas for a specific tenant (platform admin)
+app.get('/api/platform/tenants/:id/contas', authenticateToken, requirePlatformAdmin, async (req, res) => {
+  if (!runtimeCapabilities.hasTenantsTable) {
+    return res.status(400).json({ error: 'Tabela tenants não está disponível neste ambiente' });
+  }
+
+  const targetId = String(req.params.id || '').trim();
+
+  if (!targetId) {
+    return res.status(400).json({ error: 'Identificador de tenant inválido' });
+  }
+
+  try {
+    const result = runtimeCapabilities.hasContasTenantId
+      ? await pool.query('SELECT * FROM contas WHERE tenant_id::text = $1 ORDER BY mes DESC, id DESC', [targetId])
+      : await pool.query('SELECT * FROM contas ORDER BY mes DESC, id DESC');
+
+    return res.json(result.rows);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 app.patch('/api/platform/tenants/:id', authenticateToken, requirePlatformAdmin, async (req, res) => {
   if (!runtimeCapabilities.hasTenantsTable) {
     return res.status(400).json({ error: 'Tabela tenants não está disponível neste ambiente' });
