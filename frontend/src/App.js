@@ -1762,6 +1762,14 @@ const FinanceApp = () => {
     return Array.from(new Set(custom)).sort((a, b) => a.localeCompare(b, 'pt-BR'));
   }, [categorias]);
 
+  const categoriasCompras = useMemo(() => {
+    const custom = categorias
+      .filter((categoria) => categoria.scope === 'compras')
+      .map((categoria) => categoria.name);
+
+    return Array.from(new Set(custom)).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }, [categorias]);
+
   const categoriasInvestimento = useMemo(() => {
     const custom = categorias
       .filter((categoria) => categoria.scope === 'investimentos')
@@ -1777,6 +1785,35 @@ const FinanceApp = () => {
 
     return Array.from(new Set(custom)).sort((a, b) => a.localeCompare(b, 'pt-BR'));
   }, [categorias]);
+
+  const categoriasLazer = useMemo(() => {
+    const custom = categorias
+      .filter((categoria) => categoria.scope === 'lazer')
+      .map((categoria) => categoria.name);
+
+    return Array.from(new Set(custom)).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }, [categorias]);
+
+  const categoriasManutencao = useMemo(() => {
+    const custom = categorias
+      .filter((categoria) => categoria.scope === 'manutencoes' || categoria.scope === 'manutencao')
+      .map((categoria) => categoria.name);
+
+    return Array.from(new Set(custom)).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }, [categorias]);
+
+  const [viewerFilters, setViewerFilters] = useState({
+    compras: { category: '', status: 'all', search: '' },
+    contas: { category: '', status: 'all', search: '' },
+    entradas: { category: '', status: 'all', search: '' },
+    lazer: { category: '', status: 'all', search: '' },
+    investimentos: { category: '', status: 'all', search: '' },
+    manutencoes: { category: '', status: 'all', search: '' }
+  });
+
+  const updateViewerFilter = (section, key, value) => {
+    setViewerFilters((current) => ({ ...current, [section]: { ...current[section], [key]: value } }));
+  };
 
   useEffect(() => {
     if (categoriasConta.length === 0) {
@@ -2104,22 +2141,52 @@ const FinanceApp = () => {
                   </div>
                 )}
                 <FilterMonth value={mesFiltroCompras} onChange={setMesFiltroCompras} />
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                  <select
+                    value={viewerFilters.compras.category}
+                    onChange={(e) => updateViewerFilter('compras', 'category', e.target.value)}
+                    className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
+                  >
+                    <option value="">Todas categorias</option>
+                    {categoriasCompras.map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                  <select
+                    value={viewerFilters.compras.status}
+                    onChange={(e) => updateViewerFilter('compras', 'status', e.target.value)}
+                    className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
+                  >
+                    <option value="all">Todos</option>
+                    <option value="planned">Projetado</option>
+                    <option value="executed">Efetivado</option>
+                  </select>
+                  <Field value={viewerFilters.compras.search} onChange={(v) => updateViewerFilter('compras', 'search', v)} placeholder="Buscar" />
+                </div>
                 <DataTable
                   headers={['Item', 'Quantidade', 'Valor', 'Mês', 'Ações']}
-                  rows={compras.filter((compra) => compra.mes === mesFiltroCompras).map((compra) => [
-                    compra.item,
-                    compra.quantidade,
-                    formatCurrency(compra.valor),
-                    formatMonthLongLabel(compra.mes),
-                    isAdmin ? (
-                      <div key={`actions-compra-${compra.id}`} className="flex items-center gap-3">
-                        <SecondaryTextButton onClick={() => iniciarEdicaoCompra(compra)} label="Editar" />
-                        <DangerTextButton onClick={() => excluirRegistro(`/compras/${compra.id}`, 'Compra excluída com sucesso')} label="Excluir" />
-                      </div>
-                    ) : (
-                      <span key={`readonly-compra-${compra.id}`} className="text-sm text-slate-400">Somente admin altera/exclui</span>
-                    )
-                  ])}
+                  rows={compras
+                    .filter((compra) => compra.mes === mesFiltroCompras)
+                    .filter((compra) => {
+                      const f = viewerFilters.compras;
+                      if (f.category && (compra.item || '') !== f.category) return false;
+                      if (f.status === 'planned' && compra.status !== 'planned') return false;
+                      if (f.status === 'executed' && compra.status !== 'executed') return false;
+                      if (f.search && !String(compra.item || '').toLowerCase().includes(f.search.toLowerCase())) return false;
+                      return true;
+                    })
+                    .map((compra) => [
+                      compra.item,
+                      compra.quantidade,
+                      formatCurrency(compra.valor),
+                      formatMonthLongLabel(compra.mes),
+                      isAdmin ? (
+                        <div key={`actions-compra-${compra.id}`} className="flex items-center gap-3">
+                          <SecondaryTextButton onClick={() => iniciarEdicaoCompra(compra)} label="Editar" />
+                          <DangerTextButton onClick={() => excluirRegistro(`/compras/${compra.id}`, 'Compra excluída com sucesso')} label="Excluir" />
+                        </div>
+                      ) : (
+                        <span key={`readonly-compra-${compra.id}`} className="text-sm text-slate-400">Somente admin altera/exclui</span>
+                      )
+                    ])}
                   emptyMessage="Nenhuma compra registrada para este mês"
                 />
               </div>
@@ -2154,25 +2221,58 @@ const FinanceApp = () => {
                   </div>
                 )}
                 <FilterMonth value={mesFiltroContas} onChange={setMesFiltroContas} />
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                  <select
+                    value={viewerFilters.contas.category}
+                    onChange={(e) => updateViewerFilter('contas', 'category', e.target.value)}
+                    className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
+                  >
+                    <option value="">Todas categorias</option>
+                    {categoriasConta.map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                  <select
+                    value={viewerFilters.contas.status}
+                    onChange={(e) => updateViewerFilter('contas', 'status', e.target.value)}
+                    className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
+                  >
+                    <option value="all">Todos</option>
+                    <option value="planned">Projetado</option>
+                    <option value="executed">Efetivado</option>
+                  </select>
+                  <Field value={viewerFilters.contas.search} onChange={(v) => updateViewerFilter('contas', 'search', v)} placeholder="Buscar" />
+                </div>
                 <DataTable
                   headers={['Tipo', 'Valor', 'Data', 'Status', 'Ações']}
-                  rows={contas.filter((conta) => getRecordMonth(conta) === mesFiltroContas).map((conta) => [
-                    conta.tipo,
-                    formatCurrency(conta.valor),
-                    formatDate(getRecordDate(conta)),
-                    conta.status === 'planned' ? 'Projetado' : 'Efetivado',
-                    isAdmin ? (
-                      <div key={`actions-conta-${conta.id}`} className="flex items-center gap-2">
-                        {conta.status === 'planned' && (
-                          <ActionButton icon={CheckCircle2} onClick={() => confirmarConta(conta.id)} label="Confirmar" tone="primary" />
-                        )}
-                        <ActionButton icon={Pencil} onClick={() => iniciarEdicaoConta(conta)} label="Editar" tone="secondary" />
-                        <ActionButton icon={Trash2} onClick={() => excluirRegistro(`/contas/${conta.id}`, 'Conta excluída com sucesso')} label="Excluir" tone="danger" />
-                      </div>
-                    ) : (
-                      <span key={`readonly-conta-${conta.id}`} className="text-sm text-slate-400">Somente admin altera/exclui</span>
-                    )
-                  ])}
+                  rows={contas
+                    .filter((conta) => getRecordMonth(conta) === mesFiltroContas)
+                    .filter((conta) => {
+                      const f = viewerFilters.contas;
+                      if (f.category && conta.tipo !== f.category) return false;
+                      if (f.status === 'planned' && conta.status !== 'planned') return false;
+                      if (f.status === 'executed' && conta.status !== 'executed') return false;
+                      if (f.search) {
+                        const hay = `${conta.tipo} ${conta.nota || ''}`.toLowerCase();
+                        if (!hay.includes(f.search.toLowerCase())) return false;
+                      }
+                      return true;
+                    })
+                    .map((conta) => [
+                      conta.tipo,
+                      formatCurrency(conta.valor),
+                      formatDate(getRecordDate(conta)),
+                      conta.status === 'planned' ? 'Projetado' : 'Efetivado',
+                      isAdmin ? (
+                        <div key={`actions-conta-${conta.id}`} className="flex items-center gap-2">
+                          {conta.status === 'planned' && (
+                            <ActionButton icon={CheckCircle2} onClick={() => confirmarConta(conta.id)} label="Confirmar" tone="primary" />
+                          )}
+                          <ActionButton icon={Pencil} onClick={() => iniciarEdicaoConta(conta)} label="Editar" tone="secondary" />
+                          <ActionButton icon={Trash2} onClick={() => excluirRegistro(`/contas/${conta.id}`, 'Conta excluída com sucesso')} label="Excluir" tone="danger" />
+                        </div>
+                      ) : (
+                        <span key={`readonly-conta-${conta.id}`} className="text-sm text-slate-400">Somente admin altera/exclui</span>
+                      )
+                    ])}
                   emptyMessage="Nenhuma conta registrada para este mês"
                 />
               </div>
@@ -2210,26 +2310,59 @@ const FinanceApp = () => {
                   </div>
                 )}
                 <FilterMonth value={mesFiltroEntradas} onChange={setMesFiltroEntradas} />
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                  <select
+                    value={viewerFilters.entradas.category}
+                    onChange={(e) => updateViewerFilter('entradas', 'category', e.target.value)}
+                    className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
+                  >
+                    <option value="">Todas categorias</option>
+                    {categoriasEntrada.map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                  <select
+                    value={viewerFilters.entradas.status}
+                    onChange={(e) => updateViewerFilter('entradas', 'status', e.target.value)}
+                    className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
+                  >
+                    <option value="all">Todos</option>
+                    <option value="planned">Projetado</option>
+                    <option value="executed">Efetivado</option>
+                  </select>
+                  <Field value={viewerFilters.entradas.search} onChange={(v) => updateViewerFilter('entradas', 'search', v)} placeholder="Buscar" />
+                </div>
                 <DataTable
                   headers={['Categoria', 'Valor', 'Nota', 'Data', 'Status', 'Ações']}
-                  rows={entradas.filter((entrada) => getRecordMonth(entrada) === mesFiltroEntradas).map((entrada) => [
-                    entrada.tipo,
-                    formatCurrency(entrada.valor),
-                    entrada.nota || '-',
-                    formatDate(getRecordDate(entrada)),
-                    entrada.status === 'planned' ? 'Projetada' : 'Efetivada',
-                    isAdmin ? (
-                      <div key={`actions-entrada-${entrada.id}`} className="flex items-center gap-2">
-                        {entrada.status === 'planned' && (
-                          <ActionButton icon={CheckCircle2} onClick={() => confirmarEntrada(entrada.id)} label="Confirmar" tone="primary" />
-                        )}
-                        <ActionButton icon={Pencil} onClick={() => iniciarEdicaoEntrada(entrada)} label="Editar" tone="secondary" />
-                        <ActionButton icon={Trash2} onClick={() => excluirRegistro(`/entradas/${entrada.id}`, 'Entrada excluída com sucesso')} label="Excluir" tone="danger" />
-                      </div>
-                    ) : (
-                      <span key={`readonly-entrada-${entrada.id}`} className="text-sm text-slate-400">Somente admin altera/exclui</span>
-                    )
-                  ])}
+                  rows={entradas
+                    .filter((entrada) => getRecordMonth(entrada) === mesFiltroEntradas)
+                    .filter((entrada) => {
+                      const f = viewerFilters.entradas;
+                      if (f.category && entrada.tipo !== f.category) return false;
+                      if (f.status === 'planned' && entrada.status !== 'planned') return false;
+                      if (f.status === 'executed' && entrada.status !== 'executed') return false;
+                      if (f.search) {
+                        const hay = `${entrada.tipo} ${entrada.nota || ''}`.toLowerCase();
+                        if (!hay.includes(f.search.toLowerCase())) return false;
+                      }
+                      return true;
+                    })
+                    .map((entrada) => [
+                      entrada.tipo,
+                      formatCurrency(entrada.valor),
+                      entrada.nota || '-',
+                      formatDate(getRecordDate(entrada)),
+                      entrada.status === 'planned' ? 'Projetada' : 'Efetivada',
+                      isAdmin ? (
+                        <div key={`actions-entrada-${entrada.id}`} className="flex items-center gap-2">
+                          {entrada.status === 'planned' && (
+                            <ActionButton icon={CheckCircle2} onClick={() => confirmarEntrada(entrada.id)} label="Confirmar" tone="primary" />
+                          )}
+                          <ActionButton icon={Pencil} onClick={() => iniciarEdicaoEntrada(entrada)} label="Editar" tone="secondary" />
+                          <ActionButton icon={Trash2} onClick={() => excluirRegistro(`/entradas/${entrada.id}`, 'Entrada excluída com sucesso')} label="Excluir" tone="danger" />
+                        </div>
+                      ) : (
+                        <span key={`readonly-entrada-${entrada.id}`} className="text-sm text-slate-400">Somente admin altera/exclui</span>
+                      )
+                    ])}
                   emptyMessage="Nenhuma entrada registrada para este mês"
                 />
               </div>
@@ -2255,26 +2388,56 @@ const FinanceApp = () => {
                   </div>
                 )}
                 <FilterMonth value={mesFiltroLazer} onChange={setMesFiltroLazer} />
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                  <select
+                    value={viewerFilters.lazer.category}
+                    onChange={(e) => updateViewerFilter('lazer', 'category', e.target.value)}
+                    className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
+                  >
+                    <option value="">Todas categorias</option>
+                    {categoriasLazer && categoriasLazer.map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                  <select
+                    value={viewerFilters.lazer.status}
+                    onChange={(e) => updateViewerFilter('lazer', 'status', e.target.value)}
+                    className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
+                  >
+                    <option value="all">Todos</option>
+                    <option value="planned">Projetado</option>
+                    <option value="executed">Efetivado</option>
+                  </select>
+                  <Field value={viewerFilters.lazer.search} onChange={(v) => updateViewerFilter('lazer', 'search', v)} placeholder="Buscar" />
+                </div>
                 <div className="mt-6">
                   <DataTable
                     headers={['Descrição', 'Valor', 'Data', 'Status', 'Ações']}
-                    rows={lazer.filter((item) => getRecordMonth(item) === mesFiltroLazer).map((item) => [
-                      item.descricao,
-                      formatCurrency(item.valor),
-                      formatDate(getRecordDate(item)),
-                      item.status === 'planned' ? 'Projetada' : 'Efetivada',
-                      isAdmin ? (
-                        <div key={`actions-lazer-${item.id}`} className="flex items-center gap-2">
-                          {item.status === 'planned' && (
-                            <ActionButton icon={CheckCircle2} onClick={() => confirmarLazer(item.id)} label="Confirmar" tone="primary" />
-                          )}
-                          <ActionButton icon={Pencil} onClick={() => iniciarEdicaoLazer(item)} label="Editar" tone="secondary" />
-                          <ActionButton icon={Trash2} onClick={() => excluirRegistro(`/lazer/${item.id}`, 'Despesa de lazer excluída com sucesso')} label="Excluir" tone="danger" />
-                        </div>
-                      ) : (
-                        <span key={`readonly-lazer-${item.id}`} className="text-sm text-slate-400">Somente admin altera/exclui</span>
-                      )
-                    ])}
+                    rows={lazer
+                      .filter((item) => getRecordMonth(item) === mesFiltroLazer)
+                      .filter((item) => {
+                        const f = viewerFilters.lazer;
+                        if (f.category && (item.descricao || '') !== f.category) return false;
+                        if (f.status === 'planned' && item.status !== 'planned') return false;
+                        if (f.status === 'executed' && item.status !== 'executed') return false;
+                        if (f.search && !String(item.descricao || '').toLowerCase().includes(f.search.toLowerCase())) return false;
+                        return true;
+                      })
+                      .map((item) => [
+                        item.descricao,
+                        formatCurrency(item.valor),
+                        formatDate(getRecordDate(item)),
+                        item.status === 'planned' ? 'Projetada' : 'Efetivada',
+                        isAdmin ? (
+                          <div key={`actions-lazer-${item.id}`} className="flex items-center gap-2">
+                            {item.status === 'planned' && (
+                              <ActionButton icon={CheckCircle2} onClick={() => confirmarLazer(item.id)} label="Confirmar" tone="primary" />
+                            )}
+                            <ActionButton icon={Pencil} onClick={() => iniciarEdicaoLazer(item)} label="Editar" tone="secondary" />
+                            <ActionButton icon={Trash2} onClick={() => excluirRegistro(`/lazer/${item.id}`, 'Despesa de lazer excluída com sucesso')} label="Excluir" tone="danger" />
+                          </div>
+                        ) : (
+                          <span key={`readonly-lazer-${item.id}`} className="text-sm text-slate-400">Somente admin altera/exclui</span>
+                        )
+                      ])}
                     emptyMessage="Nenhuma despesa registrada para este mês"
                   />
                 </div>
@@ -2301,25 +2464,55 @@ const FinanceApp = () => {
                   </div>
                 )}
                 <FilterMonth value={mesFiltroManutencoes} onChange={setMesFiltroManutencoes} />
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                  <select
+                    value={viewerFilters.manutencoes.category}
+                    onChange={(e) => updateViewerFilter('manutencoes', 'category', e.target.value)}
+                    className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
+                  >
+                    <option value="">Todas categorias</option>
+                    {categoriasManutencao && categoriasManutencao.map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                  <select
+                    value={viewerFilters.manutencoes.status}
+                    onChange={(e) => updateViewerFilter('manutencoes', 'status', e.target.value)}
+                    className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
+                  >
+                    <option value="all">Todos</option>
+                    <option value="planned">Projetado</option>
+                    <option value="executed">Efetivado</option>
+                  </select>
+                  <Field value={viewerFilters.manutencoes.search} onChange={(v) => updateViewerFilter('manutencoes', 'search', v)} placeholder="Buscar" />
+                </div>
                 <DataTable
                   headers={['Descrição', 'Valor', 'Data', 'Status', 'Ações']}
-                  rows={manutencoes.filter((manutencao) => manutencao.data.slice(0, 7) === mesFiltroManutencoes).map((manutencao) => [
-                    manutencao.descricao,
-                    formatCurrency(manutencao.valor),
-                    formatDate(manutencao.data),
-                    manutencao.status === 'planned' ? 'Projetada' : 'Efetivada',
-                    isAdmin ? (
-                      <div key={`actions-manutencao-${manutencao.id}`} className="flex items-center gap-2">
-                        {manutencao.status === 'planned' && (
-                          <ActionButton icon={CheckCircle2} onClick={() => confirmarManutencao(manutencao.id)} label="Confirmar" tone="primary" />
-                        )}
-                        <ActionButton icon={Pencil} onClick={() => iniciarEdicaoManutencao(manutencao)} label="Editar" tone="secondary" />
-                        <ActionButton icon={Trash2} onClick={() => excluirRegistro(`/manutencoes/${manutencao.id}`, 'Despesa extraordinária excluída com sucesso')} label="Excluir" tone="danger" />
-                      </div>
-                    ) : (
-                      <span key={`readonly-manutencao-${manutencao.id}`} className="text-sm text-slate-400">Somente admin altera/exclui</span>
-                    )
-                  ])}
+                  rows={manutencoes
+                    .filter((manutencao) => manutencao.data.slice(0, 7) === mesFiltroManutencoes)
+                    .filter((manutencao) => {
+                      const f = viewerFilters.manutencoes;
+                      if (f.category && (manutencao.descricao || '') !== f.category) return false;
+                      if (f.status === 'planned' && manutencao.status !== 'planned') return false;
+                      if (f.status === 'executed' && manutencao.status !== 'executed') return false;
+                      if (f.search && !String(manutencao.descricao || '').toLowerCase().includes(f.search.toLowerCase())) return false;
+                      return true;
+                    })
+                    .map((manutencao) => [
+                      manutencao.descricao,
+                      formatCurrency(manutencao.valor),
+                      formatDate(manutencao.data),
+                      manutencao.status === 'planned' ? 'Projetada' : 'Efetivada',
+                      isAdmin ? (
+                        <div key={`actions-manutencao-${manutencao.id}`} className="flex items-center gap-2">
+                          {manutencao.status === 'planned' && (
+                            <ActionButton icon={CheckCircle2} onClick={() => confirmarManutencao(manutencao.id)} label="Confirmar" tone="primary" />
+                          )}
+                          <ActionButton icon={Pencil} onClick={() => iniciarEdicaoManutencao(manutencao)} label="Editar" tone="secondary" />
+                          <ActionButton icon={Trash2} onClick={() => excluirRegistro(`/manutencoes/${manutencao.id}`, 'Despesa extraordinária excluída com sucesso')} label="Excluir" tone="danger" />
+                        </div>
+                      ) : (
+                        <span key={`readonly-manutencao-${manutencao.id}`} className="text-sm text-slate-400">Somente admin altera/exclui</span>
+                      )
+                    ])}
                   emptyMessage="Nenhuma manutenção registrada para este mês"
                 />
               </div>
@@ -2357,26 +2550,59 @@ const FinanceApp = () => {
                   </div>
                 )}
                 <FilterMonth value={mesFiltroInvestimentos} onChange={setMesFiltroInvestimentos} />
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                  <select
+                    value={viewerFilters.investimentos.category}
+                    onChange={(e) => updateViewerFilter('investimentos', 'category', e.target.value)}
+                    className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
+                  >
+                    <option value="">Todas categorias</option>
+                    {categoriasInvestimento.map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                  <select
+                    value={viewerFilters.investimentos.status}
+                    onChange={(e) => updateViewerFilter('investimentos', 'status', e.target.value)}
+                    className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
+                  >
+                    <option value="all">Todos</option>
+                    <option value="planned">Projetado</option>
+                    <option value="executed">Efetivado</option>
+                  </select>
+                  <Field value={viewerFilters.investimentos.search} onChange={(v) => updateViewerFilter('investimentos', 'search', v)} placeholder="Buscar" />
+                </div>
                 <DataTable
                   headers={['Categoria', 'Valor', 'Descrição', 'Data', 'Status', 'Ações']}
-                  rows={investimentos.filter((investimento) => getRecordMonth(investimento) === mesFiltroInvestimentos).map((investimento) => [
-                    investimento.descricao,
-                    formatCurrency(investimento.valor),
-                    investimento.nota || '-',
-                    formatDate(getRecordDate(investimento)),
-                    investimento.status === 'planned' ? 'Projetado' : 'Efetivado',
-                    isAdmin ? (
-                      <div key={`actions-investimento-${investimento.id}`} className="flex items-center gap-2">
-                        {investimento.status === 'planned' && (
-                          <ActionButton icon={CheckCircle2} onClick={() => confirmarInvestimento(investimento.id)} label="Confirmar" tone="primary" />
-                        )}
-                        <ActionButton icon={Pencil} onClick={() => iniciarEdicaoInvestimento(investimento)} label="Editar" tone="secondary" />
-                        <ActionButton icon={Trash2} onClick={() => excluirRegistro(`/investimentos/${investimento.id}`, 'Investimento excluído com sucesso')} label="Excluir" tone="danger" />
-                      </div>
-                    ) : (
-                      <span key={`readonly-investimento-${investimento.id}`} className="text-sm text-slate-400">Somente admin altera/exclui</span>
-                    )
-                  ])}
+                  rows={investimentos
+                    .filter((investimento) => getRecordMonth(investimento) === mesFiltroInvestimentos)
+                    .filter((investimento) => {
+                      const f = viewerFilters.investimentos;
+                      if (f.category && investimento.descricao !== f.category) return false;
+                      if (f.status === 'planned' && investimento.status !== 'planned') return false;
+                      if (f.status === 'executed' && investimento.status !== 'executed') return false;
+                      if (f.search) {
+                        const hay = `${investimento.descricao} ${investimento.nota || ''}`.toLowerCase();
+                        if (!hay.includes(f.search.toLowerCase())) return false;
+                      }
+                      return true;
+                    })
+                    .map((investimento) => [
+                      investimento.descricao,
+                      formatCurrency(investimento.valor),
+                      investimento.nota || '-',
+                      formatDate(getRecordDate(investimento)),
+                      investimento.status === 'planned' ? 'Projetado' : 'Efetivado',
+                      isAdmin ? (
+                        <div key={`actions-investimento-${investimento.id}`} className="flex items-center gap-2">
+                          {investimento.status === 'planned' && (
+                            <ActionButton icon={CheckCircle2} onClick={() => confirmarInvestimento(investimento.id)} label="Confirmar" tone="primary" />
+                          )}
+                          <ActionButton icon={Pencil} onClick={() => iniciarEdicaoInvestimento(investimento)} label="Editar" tone="secondary" />
+                          <ActionButton icon={Trash2} onClick={() => excluirRegistro(`/investimentos/${investimento.id}`, 'Investimento excluído com sucesso')} label="Excluir" tone="danger" />
+                        </div>
+                      ) : (
+                        <span key={`readonly-investimento-${investimento.id}`} className="text-sm text-slate-400">Somente admin altera/exclui</span>
+                      )
+                    ])}
                   emptyMessage="Nenhum investimento registrado para este mês"
                 />
               </div>
