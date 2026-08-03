@@ -2141,7 +2141,7 @@ const FinanceApp = () => {
                   </div>
                 )}
                 <FilterMonth value={mesFiltroCompras} onChange={setMesFiltroCompras} />
-                <div className="mt-4 flex flex-wrap items-center gap-3">
+                <div className="mt-4 flex items-center gap-3">
                   <select
                     value={viewerFilters.compras.category}
                     onChange={(e) => updateViewerFilter('compras', 'category', e.target.value)}
@@ -2155,7 +2155,7 @@ const FinanceApp = () => {
                     onChange={(e) => updateViewerFilter('compras', 'status', e.target.value)}
                     className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
                   >
-                    <option value="all">Todos</option>
+                    <option value="all">Status</option>
                     <option value="planned">Projetado</option>
                     <option value="executed">Efetivado</option>
                   </select>
@@ -2221,7 +2221,7 @@ const FinanceApp = () => {
                   </div>
                 )}
                 <FilterMonth value={mesFiltroContas} onChange={setMesFiltroContas} />
-                <div className="mt-4 flex flex-wrap items-center gap-3">
+                <div className="mt-4 flex items-center gap-3">
                   <select
                     value={viewerFilters.contas.category}
                     onChange={(e) => updateViewerFilter('contas', 'category', e.target.value)}
@@ -2235,7 +2235,7 @@ const FinanceApp = () => {
                     onChange={(e) => updateViewerFilter('contas', 'status', e.target.value)}
                     className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
                   >
-                    <option value="all">Todos</option>
+                    <option value="all">Status</option>
                     <option value="planned">Projetado</option>
                     <option value="executed">Efetivado</option>
                   </select>
@@ -2310,7 +2310,7 @@ const FinanceApp = () => {
                   </div>
                 )}
                 <FilterMonth value={mesFiltroEntradas} onChange={setMesFiltroEntradas} />
-                <div className="mt-4 flex flex-wrap items-center gap-3">
+                <div className="mt-4 flex items-center gap-3">
                   <select
                     value={viewerFilters.entradas.category}
                     onChange={(e) => updateViewerFilter('entradas', 'category', e.target.value)}
@@ -2324,7 +2324,7 @@ const FinanceApp = () => {
                     onChange={(e) => updateViewerFilter('entradas', 'status', e.target.value)}
                     className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
                   >
-                    <option value="all">Todos</option>
+                    <option value="all">Status</option>
                     <option value="planned">Projetado</option>
                     <option value="executed">Efetivado</option>
                   </select>
@@ -2388,7 +2388,7 @@ const FinanceApp = () => {
                   </div>
                 )}
                 <FilterMonth value={mesFiltroLazer} onChange={setMesFiltroLazer} />
-                <div className="mt-4 flex flex-wrap items-center gap-3">
+                <div className="mt-4 flex items-center gap-3">
                   <select
                     value={viewerFilters.lazer.category}
                     onChange={(e) => updateViewerFilter('lazer', 'category', e.target.value)}
@@ -2402,7 +2402,7 @@ const FinanceApp = () => {
                     onChange={(e) => updateViewerFilter('lazer', 'status', e.target.value)}
                     className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
                   >
-                    <option value="all">Todos</option>
+                    <option value="all">Status</option>
                     <option value="planned">Projetado</option>
                     <option value="executed">Efetivado</option>
                   </select>
@@ -2464,7 +2464,7 @@ const FinanceApp = () => {
                   </div>
                 )}
                 <FilterMonth value={mesFiltroManutencoes} onChange={setMesFiltroManutencoes} />
-                <div className="mt-4 flex flex-wrap items-center gap-3">
+                <div className="mt-4 flex items-center gap-3">
                   <select
                     value={viewerFilters.manutencoes.category}
                     onChange={(e) => updateViewerFilter('manutencoes', 'category', e.target.value)}
@@ -2478,7 +2478,7 @@ const FinanceApp = () => {
                     onChange={(e) => updateViewerFilter('manutencoes', 'status', e.target.value)}
                     className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
                   >
-                    <option value="all">Todos</option>
+                    <option value="all">Status</option>
                     <option value="planned">Projetado</option>
                     <option value="executed">Efetivado</option>
                   </select>
@@ -2550,7 +2550,7 @@ const FinanceApp = () => {
                   </div>
                 )}
                 <FilterMonth value={mesFiltroInvestimentos} onChange={setMesFiltroInvestimentos} />
-                <div className="mt-4 flex flex-wrap items-center gap-3">
+                <div className="mt-4 flex items-center gap-3">
                   <select
                     value={viewerFilters.investimentos.category}
                     onChange={(e) => updateViewerFilter('investimentos', 'category', e.target.value)}
@@ -2564,7 +2564,7 @@ const FinanceApp = () => {
                     onChange={(e) => updateViewerFilter('investimentos', 'status', e.target.value)}
                     className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
                   >
-                    <option value="all">Todos</option>
+                    <option value="all">Status</option>
                     <option value="planned">Projetado</option>
                     <option value="executed">Efetivado</option>
                   </select>
